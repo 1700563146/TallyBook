@@ -50,10 +50,6 @@ JVM 测试                        ✅ 138 tests, 0 failures
 ./gradlew :app:assembleDebug
 # 产物：app/build/outputs/apk/debug/app-debug.apk
 
-# 构建已签名的 Release APK（需要先设置签名环境变量）
-./gradlew :app:assembleRelease
-# 产物：app/build/outputs/apk/release/app-release.apk
-
 # JVM 测试（金额、金额输入、时间边界、分桶）
 ./gradlew :core:model:test :core:common:testDebugUnitTest :core:data:testDebugUnitTest
 
@@ -65,13 +61,29 @@ adb shell am instrument -w com.tallybook.core.database.test/androidx.test.runner
 
 Windows 上用 `gradlew.bat`。首次构建约 2 分钟（Hilt / KSP 编译期处理）。
 
-Release 构建从环境变量读取密钥，不会把密码写进仓库：
+正式 Release 由 GitHub Actions 构建。仓库需要在 **Settings → Secrets and variables → Actions**
+中配置以下 Secrets，密钥和密码不会进入源码或构建日志：
+
+| Secret | 内容 |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | release keystore 文件的 Base64 |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore 密码 |
+| `ANDROID_KEY_ALIAS` | key alias |
+| `ANDROID_KEY_PASSWORD` | key 密码 |
+
+Windows 生成 keystore Base64：
+
+```powershell
+[Convert]::ToBase64String(
+  [IO.File]::ReadAllBytes("D:\secure\tallybook-release.jks")
+) | Set-Clipboard
+```
+
+推送符合版本号的标签后，工作流会构建、校验签名、生成 SHA-256 并创建预发布 Release：
 
 ```bash
-export SIGNING_STORE_FILE=/secure/path/tallybook-release.jks
-export SIGNING_STORE_PASSWORD='...'
-export SIGNING_KEY_ALIAS='...'
-export SIGNING_KEY_PASSWORD='...'
+git tag v0.1.0-beta.1
+git push origin v0.1.0-beta.1
 ```
 
 如果 Gradle 找不到 SDK，在根目录建 `local.properties`：
