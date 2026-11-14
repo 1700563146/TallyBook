@@ -47,7 +47,27 @@ jobs:
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/tallybook-release.jks"
           test -s "$RUNNER_TEMP/tallybook-release.jks"
 
-      - name: Build signed APK
+      - name: Verify keystore credentials
+        env:
+          SIGNING_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          keytool -list \
+            -keystore "$RUNNER_TEMP/tallybook-release.jks" \
+            -storepass:env SIGNING_STORE_PASSWORD \
+            -alias "$SIGNING_KEY_ALIAS" > /dev/null
+
+      - name: Run JVM tests
+        run: >-
+          ./gradlew
+          :core:model:test
+          :core:common:testDebugUnitTest
+          :core:data:testDebugUnitTest
+          :feature:transactions:testDebugUnitTest
+          --stacktrace
+          --console=plain
+
+      - name: Assemble signed release
         env:
           SIGNING_STORE_FILE: ${{ runner.temp }}/tallybook-release.jks
           SIGNING_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -57,10 +77,8 @@ jobs:
           ./gradlew
           :app:verifyReleaseSigning
           :app:assembleRelease
-          :core:model:test
-          :core:common:testDebugUnitTest
-          :core:data:testDebugUnitTest
-          :feature:transactions:testDebugUnitTest
+          --stacktrace
+          --console=plain
 
       - name: Package and verify APK
         run: |
