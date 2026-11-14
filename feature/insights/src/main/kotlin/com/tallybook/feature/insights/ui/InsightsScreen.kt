@@ -52,6 +52,11 @@ import com.patrykandpatrick.vico.core.cartesian.layer.ColumnCartesianLayer
 import com.tallybook.core.model.stats.SeriesMode
 import com.tallybook.core.model.stats.ReportPeriod
 import com.tallybook.core.model.stats.TrendSeries
+import com.tallybook.core.ui.components.TallyCard
+import com.tallybook.core.ui.components.tallyCardColors
+import com.tallybook.core.ui.components.tallyCardDecoration
+import com.tallybook.core.ui.components.tallyCardElevation
+import androidx.compose.material3.Card
 
 /**
  * Statistics screen.
@@ -292,33 +297,39 @@ private fun TotalsRow(state: InsightsUiState) {
 private fun TrendChartCard(state: InsightsUiState) {
     val trend = state.trend
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        if (trend == null || trend.isEmpty) {
-            Box(
-                modifier = Modifier.fillMaxWidth().height(200.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("暂无数据", style = MaterialTheme.typography.bodyMedium)
+    TallyCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+        ) {
+            if (trend == null || trend.isEmpty) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(200.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("暂无数据", style = MaterialTheme.typography.bodyMedium)
+                }
+                return@Column
             }
-            return@Column
-        }
 
-        if (state.isEmpty) {
-            Box(
-                modifier = Modifier.fillMaxWidth().height(200.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("这段时间没有收支记录", style = MaterialTheme.typography.bodyMedium)
+            if (state.isEmpty) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(200.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("这段时间没有收支记录", style = MaterialTheme.typography.bodyMedium)
+                }
+                return@Column
             }
-            return@Column
-        }
 
-        TrendChart(
-            trend = trend,
-            mode = state.mode,
-            modifier = Modifier.fillMaxWidth().height(200.dp),
-        )
-        TrendChartLabels(trend)
+            TrendChart(
+                trend = trend,
+                mode = state.mode,
+                modifier = Modifier.fillMaxWidth().height(200.dp),
+            )
+            TrendChartLabels(trend)
+        }
     }
 }
 
@@ -394,30 +405,35 @@ private fun CategoryBreakdownRow(
     count: Int,
     onClick: () -> Unit = {},
 ) {
-    Column(
+    Card(
+        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 4.dp),
+            .tallyCardDecoration(),
+        shape = MaterialTheme.shapes.medium,
+        colors = tallyCardColors(),
+        elevation = tallyCardElevation(),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(name, style = MaterialTheme.typography.bodyLarge)
-            Text(amountLabel, style = MaterialTheme.typography.bodyLarge)
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(name, style = MaterialTheme.typography.bodyLarge)
+                Text(amountLabel, style = MaterialTheme.typography.bodyLarge)
+            }
+            androidx.compose.material3.LinearProgressIndicator(
+                progress = { share.coerceIn(0f, 1f) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+            )
+            Text(
+                "${(share * 100).toInt()}% · $count 笔",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(top = 2.dp),
+            )
         }
-        androidx.compose.material3.LinearProgressIndicator(
-            progress = { share.coerceIn(0f, 1f) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp),
-        )
-        Text(
-            "${(share * 100).toInt()}% · $count 笔",
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(top = 2.dp),
-        )
     }
 }
 

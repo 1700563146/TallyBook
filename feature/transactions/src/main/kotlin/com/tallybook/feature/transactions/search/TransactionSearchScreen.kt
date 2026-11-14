@@ -40,6 +40,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +58,9 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.tallybook.core.data.repository.SearchEntryType
 import com.tallybook.feature.transactions.categoryIcon
+import com.tallybook.core.ui.components.tallyCardColors
+import com.tallybook.core.ui.components.tallyCardDecoration
+import com.tallybook.core.ui.components.tallyCardElevation
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,8 +78,10 @@ fun TransactionSearchScreen(
     val results = viewModel.results.collectAsLazyPagingItems()
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 title = { Text("搜索与筛选") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -248,8 +254,13 @@ private fun SearchResultCard(
 ) {
     val row = item.row
     Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .tallyCardDecoration(),
+        shape = MaterialTheme.shapes.medium,
+        colors = tallyCardColors(),
+        elevation = tallyCardElevation(),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),

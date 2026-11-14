@@ -2,6 +2,21 @@
 
 All notable changes to TallyBook are documented here.
 
+## v0.1.1-beta.1 - 2026-11-14
+
+### Added
+
+- Persistent theme selection with system, light and dark modes.
+- Three app-wide interface styles: glass, simple and flat.
+- Glass background atmosphere, translucent cards, style-aware borders, shapes, elevation and navigation.
+- Appearance controls in Settings with immediate preview.
+
+### Changed
+
+- Ledger summary, transaction, search, budget, chart, category and recycle-bin cards now share a coherent visual hierarchy.
+- Settings is reorganized into grouped panels with clearer action emphasis.
+- Splash window background follows the system light/dark appearance.
+
 ## v0.1.0-beta.1 - 2026-11-14
 
 ### Added

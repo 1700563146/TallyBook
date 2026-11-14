@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -32,6 +33,9 @@ import com.tallybook.core.model.money.CurrencyCode
 import com.tallybook.core.model.money.Money
 import com.tallybook.core.model.stats.BudgetProgress
 import com.tallybook.core.model.transaction.BudgetPeriod
+import com.tallybook.core.ui.components.tallyCardColors
+import com.tallybook.core.ui.components.tallyCardDecoration
+import com.tallybook.core.ui.components.tallyCardElevation
 
 /**
  * Budget screen.
@@ -66,6 +70,7 @@ fun BudgetContent(
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
         floatingActionButton = {
             FloatingActionButton(onClick = onAddClick) {
                 Icon(Icons.Filled.Add, contentDescription = "新建预算")
@@ -163,7 +168,15 @@ private fun BudgetCard(progress: BudgetProgress, onClick: () -> Unit = {}) {
         else -> MaterialTheme.colorScheme.primary
     }
 
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .tallyCardDecoration(),
+        shape = MaterialTheme.shapes.large,
+        colors = tallyCardColors(),
+        elevation = tallyCardElevation(),
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

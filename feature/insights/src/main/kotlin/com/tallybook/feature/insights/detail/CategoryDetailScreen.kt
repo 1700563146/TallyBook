@@ -20,14 +20,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tallybook.core.ui.components.tallyCardColors
+import com.tallybook.core.ui.components.tallyCardDecoration
+import com.tallybook.core.ui.components.tallyCardElevation
 
 /**
  * Drill-down list for one category in one window.
@@ -54,8 +59,10 @@ fun CategoryDetailContent(
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 title = { Text(state.categoryName) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -125,10 +132,12 @@ fun CategoryDetailContent(
                     }
                     items(group.rows, key = { it.id }) { row ->
                         Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .tallyCardDecoration(),
+                            shape = MaterialTheme.shapes.medium,
+                            colors = tallyCardColors(),
+                            elevation = tallyCardElevation(),
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(12.dp),

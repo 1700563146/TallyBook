@@ -39,6 +39,10 @@ JVM 测试                        ✅ 138 tests, 0 failures
 | --- | --- |
 | ![分类下钻](docs/images/11-category-detail.png) | ![导入预览](docs/images/12-import-preview.png) |
 
+| 毛玻璃 | 简约 | 扁平 | 暗色毛玻璃 |
+| --- | --- | --- | --- |
+| ![毛玻璃](docs/images/14-appearance-glass.png) | ![简约](docs/images/15-appearance-simple.png) | ![扁平](docs/images/16-appearance-flat.png) | ![暗色](docs/images/17-appearance-dark.png) |
+
 ---
 
 ## 快速开始
@@ -171,6 +175,7 @@ sdk.dir=C:/Users/<you>/AppData/Local/Android/Sdk
 | 记一笔（自定义键盘 / 分类 / 账户 / 转账 / 日期 / 备注） | ✅ 可用 |
 | 明细列表（月份切换 / 日分组 / 小计 / 编辑 / 删除 / 撤销） | ✅ 可用 |
 | 跨月搜索与筛选（备注 / 分类 / 账户 / 收支类型） | ✅ 可用 |
+| 外观设置（系统 / 亮色 / 暗色 + 毛玻璃 / 简约 / 扁平） | ✅ 可用 |
 | 统计图表（周·月·年 × 支出·收入·两者，折线 + 柱状） | ✅ 可用 |
 | 分类占比排行 + 下钻到明细 | ✅ 可用 |
 | 周 / 月预算（新建 / 编辑 / 删除 + 进度、配速、期末超支推算） | ✅ 可用 |

@@ -30,6 +30,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,6 +45,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tallybook.feature.transactions.categoryIcon
+import com.tallybook.core.ui.components.tallyCardColors
+import com.tallybook.core.ui.components.tallyCardDecoration
+import com.tallybook.core.ui.components.tallyCardElevation
 
 /**
  * Recycle bin.
@@ -92,9 +96,11 @@ fun RecycleBinContent(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 title = { Text(if (state.count > 0) "回收站 · ${state.count}" else "回收站") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -193,10 +199,12 @@ private fun DeletedRow(
     onPurge: () -> Unit,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .tallyCardDecoration(),
+        shape = MaterialTheme.shapes.medium,
+        colors = tallyCardColors(),
+        elevation = tallyCardElevation(),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(

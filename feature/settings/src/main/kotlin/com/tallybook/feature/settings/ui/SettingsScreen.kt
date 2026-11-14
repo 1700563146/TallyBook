@@ -14,11 +14,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -38,6 +39,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tallybook.core.model.settings.ThemeMode
+import com.tallybook.core.model.settings.UiStyle
+import com.tallybook.core.ui.components.TallyCard
+import com.tallybook.core.ui.components.tallyCardColors
 
 /**
  * Settings.
@@ -61,6 +66,8 @@ fun SettingsScreen(
         onMessageShown = viewModel::onMessageShown,
         onOpenRecycleBin = onOpenRecycleBin,
         onNotificationsEnabledChange = viewModel::setNotificationsEnabled,
+        onThemeModeChange = viewModel::setThemeMode,
+        onUiStyleChange = viewModel::setUiStyle,
         onExportCsv = viewModel::exportCsv,
         onExportJson = viewModel::exportJson,
         onOpenCategories = onOpenCategories,
@@ -79,6 +86,8 @@ fun SettingsContent(
     onMessageShown: () -> Unit,
     onOpenRecycleBin: () -> Unit = {},
     onNotificationsEnabledChange: (Boolean) -> Unit = {},
+    onThemeModeChange: (ThemeMode) -> Unit = {},
+    onUiStyleChange: (UiStyle) -> Unit = {},
     onExportCsv: (Uri) -> Unit = {},
     onExportJson: (Uri) -> Unit = {},
     onOpenCategories: () -> Unit = {},
@@ -112,6 +121,7 @@ fun SettingsContent(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Column(
@@ -120,162 +130,191 @@ fun SettingsContent(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("提醒", style = MaterialTheme.typography.titleMedium)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+            TallyCard(
+                colors = tallyCardColors(MaterialTheme.colorScheme.primaryContainer),
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("预算超支提醒", style = MaterialTheme.typography.bodyLarge)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     Text(
-                        if (state.notificationsPermitted) {
-                            "接近或超出预算时通知你，每个周期最多两次。"
-                        } else {
-                            "系统未授权通知，提醒不会显示。"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (state.notificationsPermitted) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.error
-                        },
+                        "让账本更像你的账本",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Text(
+                        "切换明暗模式与界面质感，偏好会保存在本机并立即生效。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Switch(
-                    checked = state.notificationsEnabled,
-                    onCheckedChange = onNotificationsEnabledChange,
+            }
+
+            SettingsPanel(
+                title = "外观与质感",
+                subtitle = "显示模式和界面风格可分别选择。",
+            ) {
+                SettingsSubLabel("显示模式")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    ThemeMode.entries.forEach { mode ->
+                        FilterChip(
+                            selected = state.themeMode == mode,
+                            onClick = { onThemeModeChange(mode) },
+                            label = { Text(mode.label()) },
+                        )
+                    }
+                }
+
+                SettingsSubLabel("界面风格")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    UiStyle.entries.forEach { style ->
+                        FilterChip(
+                            selected = state.uiStyle == style,
+                            onClick = { onUiStyleChange(style) },
+                            label = { Text(style.label()) },
+                        )
+                    }
+                }
+                Text(
+                    state.uiStyle.description(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
-            if (!state.notificationsPermitted) {
-                // The switch alone cannot fix this, so offer the actual remedy.
-                OutlinedButton(
-                    onClick = {
-                        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                        runCatching { context.startActivity(intent) }
-                    },
+            SettingsPanel(
+                title = "提醒",
+                subtitle = "预算提醒完全在本机计算。",
+            ) {
+                Row(
                     modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("去系统设置开启通知权限")
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("预算超支提醒", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            if (state.notificationsPermitted) {
+                                "接近或超出预算时通知你，每个周期最多两次。"
+                            } else {
+                                "系统未授权通知，提醒不会显示。"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (state.notificationsPermitted) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
+                        )
+                    }
+                    Switch(
+                        checked = state.notificationsEnabled,
+                        onCheckedChange = onNotificationsEnabledChange,
+                    )
+                }
+
+                if (!state.notificationsPermitted) {
+                    OutlinedButton(
+                        onClick = {
+                            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            runCatching { context.startActivity(intent) }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("去系统设置开启通知权限")
+                    }
                 }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-            Text("数据", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "账本只保存在这台设备上，不会上传到任何服务器。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Button(
-                onClick = onLoadDemo,
-                enabled = !state.busy,
-                modifier = Modifier.fillMaxWidth(),
+            SettingsPanel(
+                title = "本地数据",
+                subtitle = "账本只保存在这台设备上，不会上传到服务器。",
             ) {
-                Text(if (state.busy) "处理中…" else "载入示例数据")
-            }
-            Text(
-                "仅在你还没有任何记录时才会写入，用于预览图表与预算效果。",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            OutlinedButton(
-                onClick = { confirmClear = true },
-                enabled = !state.busy,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("清空全部数据")
+                Button(
+                    onClick = onLoadDemo,
+                    enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (state.busy) "处理中…" else "载入示例数据")
+                }
+                SettingsHint("仅在没有记录时写入，用于预览图表与预算。")
+                OutlinedButton(
+                    onClick = { confirmClear = true },
+                    enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("清空全部数据", color = MaterialTheme.colorScheme.error)
+                }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-            Text("导出备份", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "CSV 给表格软件看，JSON 是完整备份（含已删除记录与预算）。文件保存在你选的位置。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Button(
-                onClick = { exportCsvLauncher.launch(suggestedFileName("csv")) },
-                enabled = !state.busy,
-                modifier = Modifier.fillMaxWidth(),
+            SettingsPanel(
+                title = "备份与恢复",
+                subtitle = "JSON 是完整备份；CSV 适合交给表格软件查看。",
             ) {
-                Text("导出 CSV")
+                Button(
+                    onClick = { exportCsvLauncher.launch(suggestedFileName("csv")) },
+                    enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("导出 CSV")
+                }
+                OutlinedButton(
+                    onClick = { exportJsonLauncher.launch(suggestedFileName("json")) },
+                    enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("导出 JSON")
+                }
+                OutlinedButton(
+                    onClick = {
+                        importLauncher.launch(
+                            arrayOf("application/json", "text/plain", "application/octet-stream"),
+                        )
+                    },
+                    enabled = !state.busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("导入 JSON 备份")
+                }
+                SettingsHint("导入前会预览数量，已有记录自动跳过。")
             }
-            OutlinedButton(
-                onClick = { exportJsonLauncher.launch(suggestedFileName("json")) },
-                enabled = !state.busy,
-                modifier = Modifier.fillMaxWidth(),
+
+            SettingsPanel(
+                title = "账本结构",
+                subtitle = "管理记账时使用的分类、账户与已删除记录。",
             ) {
-                Text("导出 JSON")
+                OutlinedButton(
+                    onClick = onOpenCategories,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("分类管理") }
+                OutlinedButton(
+                    onClick = onOpenAccounts,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("账户管理") }
+                OutlinedButton(
+                    onClick = onOpenRecycleBin,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("回收站") }
             }
 
-            OutlinedButton(
-                onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
-                enabled = !state.busy,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("导入 JSON 备份")
-            }
-            Text(
-                "导入前会先显示将写入多少条记录，已存在的记录会自动跳过。",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-            Text("记账", style = MaterialTheme.typography.titleMedium)
-            OutlinedButton(
-                onClick = onOpenCategories,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("分类管理") }
-            Text(
-                "增改名、归档不用的分类。归档只影响以后记账，历史记录还在。",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedButton(
-                onClick = onOpenAccounts,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("账户管理") }
-            Text(
-                "现金、支付宝、银行卡等；可设置初始余额。",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedButton(
-                onClick = onOpenRecycleBin,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("回收站")
-            }
-            Text(
-                "删除的记录会先放在这里，可以恢复或彻底删除。",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-            Text("即将支持", style = MaterialTheme.typography.titleMedium)
-            Text(
-                """
-                · 标签
-                · 多账本
-                · 定期记账（房租、订阅自动生成）
-                """.trimIndent(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            SettingsPanel(
+                title = "即将支持",
+                subtitle = "标签 · 多账本 · 定期记账",
+            ) {}
 
             Spacer(Modifier.height(24.dp))
         }
@@ -345,6 +384,67 @@ fun SettingsContent(
             },
         )
     }
+}
+
+@Composable
+private fun SettingsPanel(
+    title: String,
+    subtitle: String,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    TallyCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            content()
+        }
+    }
+}
+
+@Composable
+private fun SettingsSubLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 2.dp),
+    )
+}
+
+@Composable
+private fun SettingsHint(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+private fun ThemeMode.label(): String = when (this) {
+    ThemeMode.SYSTEM -> "跟随系统"
+    ThemeMode.LIGHT -> "亮色"
+    ThemeMode.DARK -> "暗色"
+}
+
+private fun UiStyle.label(): String = when (this) {
+    UiStyle.GLASS -> "毛玻璃"
+    UiStyle.SIMPLE -> "简约"
+    UiStyle.FLAT -> "扁平"
+}
+
+private fun UiStyle.description(): String = when (this) {
+    UiStyle.GLASS -> "半透明面板、渐变氛围与细描边，层次更丰富。"
+    UiStyle.SIMPLE -> "柔和圆角、克制阴影与暖色留白，长时间阅读更轻松。"
+    UiStyle.FLAT -> "紧凑圆角、无投影、细边界，信息密度更高。"
 }
 
 /** `tallybook-20261107.csv` — a dated name makes repeated exports distinguishable in the picker. */

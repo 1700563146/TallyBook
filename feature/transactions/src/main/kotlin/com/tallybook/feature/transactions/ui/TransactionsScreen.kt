@@ -54,6 +54,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tallybook.feature.transactions.categoryIcon
+import com.tallybook.core.ui.components.tallyCardColors
+import com.tallybook.core.ui.components.tallyCardDecoration
+import com.tallybook.core.ui.components.tallyCardElevation
 
 /**
  * Ledger list.
@@ -141,6 +144,7 @@ fun TransactionsContent(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddClick) {
@@ -200,14 +204,14 @@ private fun BudgetSummaryRow(cards: List<BudgetCardUi>) {
     ) {
         cards.forEach { card ->
             Card(
-                modifier = Modifier.weight(1f),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (card.isOverBudget) {
-                        MaterialTheme.colorScheme.errorContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerLow
-                    },
+                modifier = Modifier
+                    .weight(1f)
+                    .tallyCardDecoration(),
+                shape = MaterialTheme.shapes.large,
+                colors = tallyCardColors(
+                    if (card.isOverBudget) MaterialTheme.colorScheme.errorContainer else null,
                 ),
+                elevation = tallyCardElevation(),
             ) {
                 Column(modifier = Modifier.padding(10.dp)) {
                     Text(
@@ -262,10 +266,11 @@ private fun MiniChartCard(bars: List<MiniBarUi>, onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .tallyCardDecoration(),
+        shape = MaterialTheme.shapes.large,
+        colors = tallyCardColors(),
+        elevation = tallyCardElevation(),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -330,7 +335,16 @@ private fun MonthHeader(
     onNext: () -> Unit,
     onSearch: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .tallyCardDecoration(),
+        shape = MaterialTheme.shapes.large,
+        colors = tallyCardColors(),
+        elevation = tallyCardElevation(),
+    ) {
+      Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onPrevious) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "上个月")
@@ -371,6 +385,7 @@ private fun MonthHeader(
                 )
             }
         }
+      }
     }
 }
 
@@ -422,8 +437,11 @@ private fun TransactionRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .tallyCardDecoration(),
+        shape = MaterialTheme.shapes.medium,
+        colors = tallyCardColors(),
+        elevation = tallyCardElevation(),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),

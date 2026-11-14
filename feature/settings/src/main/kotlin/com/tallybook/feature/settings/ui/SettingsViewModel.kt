@@ -3,6 +3,7 @@ package com.tallybook.feature.settings.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import android.net.Uri
+import com.tallybook.core.data.appearance.AppearanceSettings
 import com.tallybook.core.data.export.ExportService
 import com.tallybook.core.data.export.ImportEnvelope
 import com.tallybook.core.data.export.ImportPreview
@@ -10,6 +11,8 @@ import com.tallybook.core.data.export.ImportService
 import com.tallybook.core.data.initializer.InitialDataSeeder
 import com.tallybook.core.data.notify.BudgetAlertChecker
 import com.tallybook.core.data.notify.NotificationSettings
+import com.tallybook.core.model.settings.ThemeMode
+import com.tallybook.core.model.settings.UiStyle
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +28,8 @@ data class SettingsUiState(
     val notificationsEnabled: Boolean = true,
     /** Whether the OS currently allows this app to post notifications. */
     val notificationsPermitted: Boolean = true,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val uiStyle: UiStyle = UiStyle.GLASS,
     /** Non-null while the import confirmation dialog is showing. */
     val importPreview: ImportPreview? = null,
 )
@@ -40,6 +45,7 @@ data class SettingsUiState(
 class SettingsViewModel @Inject constructor(
     private val seeder: InitialDataSeeder,
     private val notificationSettings: NotificationSettings,
+    private val appearanceSettings: AppearanceSettings,
     private val budgetAlertChecker: BudgetAlertChecker,
     private val exportService: ExportService,
     private val importService: ImportService,
@@ -57,6 +63,16 @@ class SettingsViewModel @Inject constructor(
                 _uiState.update { it.copy(notificationsEnabled = enabled) }
             }
         }
+        viewModelScope.launch {
+            appearanceSettings.preferences.collect { appearance ->
+                _uiState.update {
+                    it.copy(
+                        themeMode = appearance.themeMode,
+                        uiStyle = appearance.uiStyle,
+                    )
+                }
+            }
+        }
         refreshPermissionState()
     }
 
@@ -71,6 +87,14 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             notificationSettings.setEnabled(enabled)
         }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch { appearanceSettings.setThemeMode(mode) }
+    }
+
+    fun setUiStyle(style: UiStyle) {
+        viewModelScope.launch { appearanceSettings.setUiStyle(style) }
     }
 
     fun exportCsv(uri: Uri) {
