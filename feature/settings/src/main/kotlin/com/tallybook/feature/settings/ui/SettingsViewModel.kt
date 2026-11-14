@@ -11,6 +11,9 @@ import com.tallybook.core.data.export.ImportService
 import com.tallybook.core.data.initializer.InitialDataSeeder
 import com.tallybook.core.data.notify.BudgetAlertChecker
 import com.tallybook.core.data.notify.NotificationSettings
+import com.tallybook.core.data.wechat.WeChatImportEnvelope
+import com.tallybook.core.data.wechat.WeChatImportPreview
+import com.tallybook.core.data.wechat.WeChatImportService
 import com.tallybook.core.model.settings.ThemeMode
 import com.tallybook.core.model.settings.UiStyle
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,6 +35,7 @@ data class SettingsUiState(
     val uiStyle: UiStyle = UiStyle.SIMPLE,
     /** Non-null while the import confirmation dialog is showing. */
     val importPreview: ImportPreview? = null,
+    val wechatPreview: WeChatImportPreview? = null,
 )
 
 /**
@@ -49,10 +53,12 @@ class SettingsViewModel @Inject constructor(
     private val budgetAlertChecker: BudgetAlertChecker,
     private val exportService: ExportService,
     private val importService: ImportService,
+    private val weChatImportService: WeChatImportService,
 ) : ViewModel() {
 
     /** Parsed file kept between preview and confirmation so the document is read once. */
     private var pendingImport: ImportEnvelope? = null
+    private var pendingWeChatImport: WeChatImportEnvelope? = null
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -157,6 +163,63 @@ class SettingsViewModel @Inject constructor(
                     pendingImport = null
                     _uiState.update {
                         it.copy(busy = false, message = error.message ?: "导入失败，数据未改变")
+                    }
+                }
+        }
+    }
+
+    fun onWeChatBillSelected(uri: Uri) {
+        if (_uiState.value.busy) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(busy = true, message = null, wechatPreview = null) }
+            runCatching { weChatImportService.preview(uri) }
+                .onSuccess { loaded ->
+                    pendingWeChatImport = loaded
+                    _uiState.update { it.copy(busy = false, wechatPreview = loaded.preview) }
+                }
+                .onFailure { error ->
+                    pendingWeChatImport = null
+                    _uiState.update {
+                        it.copy(busy = false, message = error.message ?: "无法解析微信账单")
+                    }
+                }
+        }
+    }
+
+    fun dismissWeChatImport() {
+        pendingWeChatImport = null
+        _uiState.update { it.copy(wechatPreview = null) }
+    }
+
+    fun confirmWeChatImport() {
+        val loaded = pendingWeChatImport ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(busy = true, wechatPreview = null) }
+            runCatching { weChatImportService.apply(loaded) }
+                .onSuccess { result ->
+                    pendingWeChatImport = null
+                    _uiState.update {
+                        it.copy(
+                            busy = false,
+                            message = buildString {
+                                append("已导入 ${result.inserted} 条微信记录")
+                                if (result.skippedExisting > 0) {
+                                    append("，跳过 ${result.skippedExisting} 条已存在记录")
+                                }
+                                if (result.skippedNeutral > 0) {
+                                    append("，忽略 ${result.skippedNeutral} 条中性交易")
+                                }
+                                if (result.skippedUnmatchedRefunds > 0) {
+                                    append("，跳过 ${result.skippedUnmatchedRefunds} 条未匹配退款")
+                                }
+                            },
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    pendingWeChatImport = null
+                    _uiState.update {
+                        it.copy(busy = false, message = error.message ?: "微信账单导入失败")
                     }
                 }
         }

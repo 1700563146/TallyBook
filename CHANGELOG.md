@@ -9,6 +9,9 @@ All notable changes to TallyBook are documented here.
 - Persistent theme selection with system, light and dark modes.
 - Two app-wide interface styles: simple and flat.
 - Appearance controls in Settings with immediate preview.
+- WeChat Pay XLSX bill import with preview, deterministic de-duplication and automatic category mapping.
+- Refund matching against original refunded expenses, with unmatched refunds reported and skipped safely.
+- Native XLSX parsing with ZIP/XML size limits and no third-party file parser dependency.
 
 ### Changed
 

@@ -60,6 +60,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tallybook.core.model.settings.ThemeMode
 import com.tallybook.core.model.settings.UiStyle
+import com.tallybook.core.model.money.CurrencyCode
+import com.tallybook.core.model.money.Money
+import com.tallybook.core.data.wechat.WeChatImportPreview
 import com.tallybook.core.ui.components.TallyCard
 import com.tallybook.core.ui.components.tallyCardColors
 import com.tallybook.core.ui.components.tallyCardElevation
@@ -249,6 +252,9 @@ fun BackupRestoreSettingsScreen(
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri: Uri? -> uri?.let(viewModel::onImportSelected) }
+    val weChatLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? -> uri?.let(viewModel::onWeChatBillSelected) }
 
     LaunchedEffect(state.message) {
         val message = state.message ?: return@LaunchedEffect
@@ -294,6 +300,30 @@ fun BackupRestoreSettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("导入 JSON 备份") }
         }
+        SettingsPanel(
+            title = "微信支付账单",
+            subtitle = "支持微信导出的 XLSX 流水文件，按交易单号去重。",
+        ) {
+            OutlinedButton(
+                onClick = {
+                    weChatLauncher.launch(
+                        arrayOf(
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            "application/octet-stream",
+                        ),
+                    )
+                },
+                enabled = !state.busy,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (state.busy) "解析中…" else "导入微信 Excel 账单")
+            }
+            Text(
+                "收入、支出会进入“微信支付”账户；中性交易和无法匹配原支出的退款默认跳过。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 
     state.importPreview?.let { preview ->
@@ -301,6 +331,14 @@ fun BackupRestoreSettingsScreen(
             preview = preview,
             onConfirm = viewModel::confirmImport,
             onDismiss = viewModel::dismissImport,
+        )
+    }
+
+    state.wechatPreview?.let { preview ->
+        WeChatImportPreviewDialog(
+            preview = preview,
+            onConfirm = viewModel::confirmWeChatImport,
+            onDismiss = viewModel::dismissWeChatImport,
         )
     }
 }
@@ -579,6 +617,64 @@ private fun ImportPreviewDialog(
         },
         confirmButton = {
             TextButton(onClick = onConfirm, enabled = !preview.hasBlockingProblems) {
+                Text("导入")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
+}
+
+@Composable
+private fun WeChatImportPreviewDialog(
+    preview: WeChatImportPreview,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("导入微信账单？") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("微信账单共 ${preview.totalRows} 行")
+                Text("· 支出 ${preview.expenseCount} 笔，收入 ${preview.incomeCount} 笔")
+                Text("· 可导入 ${preview.importableCount} 笔，已存在 ${preview.existingCount} 笔")
+                Text("· 退款已匹配 ${preview.matchedRefundCount} 笔")
+                if (preview.neutralCount > 0) {
+                    Text("· 将跳过 ${preview.neutralCount} 笔中性交易")
+                }
+                if (preview.unmatchedRefundCount > 0) {
+                    Text(
+                        "· 将跳过 ${preview.unmatchedRefundCount} 笔无法匹配原支出的退款" +
+                            "（${Money(preview.unmatchedRefundMinor, CurrencyCode.CNY).format()}）",
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                if (preview.invalidRowCount > 0) {
+                    Text("· 无法识别 ${preview.invalidRowCount} 行")
+                }
+                if (preview.duplicateIdCount > 0) {
+                    Text("· 重复交易单号 ${preview.duplicateIdCount} 个")
+                }
+                Text(
+                    "账单支出 ${Money(preview.parsedExpenseMinor, CurrencyCode.CNY).format()}，" +
+                        "收入 ${Money(preview.parsedIncomeMinor, CurrencyCode.CNY).format()}",
+                )
+                if (!preview.declaredTotalsMatch) {
+                    Text(
+                        "解析合计与微信账单汇总不一致，请在导入后核对明细。",
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                Text("导入账户：${preview.targetAccountName}")
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = preview.importableCount > 0,
+            ) {
                 Text("导入")
             }
         },

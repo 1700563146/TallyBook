@@ -3,7 +3,7 @@
 > 一款 Kotlin + Jetpack Compose 的 Android 记账本。**单币种、离线优先、金额零误差**。
 >
 > 本文档描述分层架构、模块划分与关键决策。仓库内已有**真实可编译**的骨架：
-> `./gradlew :app:assembleDebug` 通过，**160 个测试全绿**（138 JVM + 22 真机仪器化）。
+> `./gradlew :app:assembleDebug` 通过，**163 个测试全绿**（141 JVM + 22 真机仪器化）。
 
 **配套文档**
 
@@ -343,7 +343,7 @@ budgets          (category_id?, period ∈ {WEEKLY, MONTHLY}, limit, include_sub
 ./gradlew :app:assembleDebug       # ✅ BUILD SUCCESSFUL，app-debug.apk 25 MB
 ./gradlew :core:model:test \
           :core:common:testDebugUnitTest \
-          :core:data:testDebugUnitTest   # ✅ 138 JVM tests, 0 failures
+          :core:data:testDebugUnitTest   # ✅ 141 JVM tests, 0 failures
 # 真机仪器化（需要已连接的设备/模拟器）
 ./gradlew :core:database:assembleDebugAndroidTest
 adb shell am instrument -w com.tallybook.core.database.test/androidx.test.runner.AndroidJUnitRunner
