@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TallyBook</string>
+
+    <string name="nav_transactions">明细</string>
+    <string name="nav_statistics">统计</string>
+    <string name="nav_budget">预算</string>
+    <string name="nav_settings">设置</string>
+
+    <string name="action_add">记一笔</string>
+    <string name="action_save">保存</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_undo">撤销</string>
+
+    <string name="empty_transactions">还没有记录，点右下角开始记第一笔</string>
+    <string name="channel_budget_alerts">预算提醒</string>
+    <string name="channel_budget_alerts_description">接近或超出预算时提醒</string>
+</resources>

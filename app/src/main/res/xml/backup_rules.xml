@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Backup rules.
+
+  A ledger is private financial data: it must NOT be backed up by default to Google Drive without
+  explicit user consent, and the DB is excluded here so that a user-initiated export (CSV/JSON via
+  SAF) stays the single source of truth for portability. Revisit if cloud sync is added.
+-->
+<full-backup-content>
+    <exclude domain="database" path="tallybook.db" />
+    <exclude domain="database" path="tallybook.db-shm" />
+    <exclude domain="database" path="tallybook.db-wal" />
+</full-backup-content>

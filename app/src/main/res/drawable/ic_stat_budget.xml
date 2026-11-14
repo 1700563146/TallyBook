@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Notification small icon.
+  Status-bar icons are masked to a single colour, so this must be a flat white silhouette with
+  transparency — the coloured launcher foreground would render as a grey blob.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M4,5h16a1,1 0 0 1 1,1v3H3V6a1,1 0 0 1 1,-1z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M3,10h18v8a1,1 0 0 1 -1,1H4a1,1 0 0 1 -1,-1zM15,13v2h4v-2z" />
+</vector>
