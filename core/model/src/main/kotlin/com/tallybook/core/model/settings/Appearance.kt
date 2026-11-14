@@ -7,12 +7,11 @@ enum class ThemeMode {
 }
 
 enum class UiStyle {
-    GLASS,
     SIMPLE,
     FLAT,
 }
 
 data class AppearancePreferences(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val uiStyle: UiStyle = UiStyle.GLASS,
+    val uiStyle: UiStyle = UiStyle.SIMPLE,
 )

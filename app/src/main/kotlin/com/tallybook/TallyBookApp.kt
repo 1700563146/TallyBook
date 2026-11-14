@@ -1,16 +1,12 @@
 package com.tallybook
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -30,10 +26,8 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.tallybook.core.model.settings.UiStyle
 import com.tallybook.core.ui.components.TallyPageBackground
 import com.tallybook.core.ui.components.tallyNavigationBarColor
-import com.tallybook.core.ui.theme.LocalTallyBookStyle
 import com.tallybook.feature.budget.navigation.BudgetRoute
 import com.tallybook.feature.budget.navigation.budgetGraph
 import com.tallybook.feature.insights.navigation.InsightsRoute
@@ -67,7 +61,6 @@ fun TallyBookApp() {
         themeMode = appearance.themeMode,
         uiStyle = appearance.uiStyle,
     ) {
-        val uiStyle = LocalTallyBookStyle.current
         val navController = rememberNavController()
         val backStackEntry by navController.currentBackStackEntryAsState()
         val currentDestination = backStackEntry?.destination
@@ -103,41 +96,31 @@ fun TallyBookApp() {
             Scaffold(
                 containerColor = Color.Transparent,
                 bottomBar = {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        if (uiStyle != UiStyle.SIMPLE) {
-                            HorizontalDivider(
-                                thickness = 1.dp,
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(
-                                    alpha = if (uiStyle == UiStyle.GLASS) 0.42f else 0.72f,
-                                ),
-                            )
-                        }
-                        NavigationBar(
-                            containerColor = tallyNavigationBarColor(),
-                            tonalElevation = if (uiStyle == UiStyle.SIMPLE) 4.dp else 0.dp,
-                        ) {
-                            topLevelDestinations.forEach { destination ->
-                                val selected = currentDestination?.hierarchy?.any {
-                                    it.hasRoute(destination.routeClass)
-                                } == true
+                    NavigationBar(
+                        containerColor = tallyNavigationBarColor(),
+                        tonalElevation = 0.dp,
+                    ) {
+                        topLevelDestinations.forEach { destination ->
+                            val selected = currentDestination?.hierarchy?.any {
+                                it.hasRoute(destination.routeClass)
+                            } == true
 
-                                NavigationBarItem(
-                                    selected = selected,
-                                    onClick = {
-                                        navController.navigate(destination.route) {
-                                            popUpTo(navController.graph.findStartDestination().id) {
-                                                saveState = true
-                                            }
-                                            launchSingleTop = true
-                                            restoreState = true
+                            NavigationBarItem(
+                                selected = selected,
+                                onClick = {
+                                    navController.navigate(destination.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
                                         }
-                                    },
-                                    icon = {
-                                        Icon(destination.icon, contentDescription = null)
-                                    },
-                                    label = { Text(stringResource(destination.labelRes)) },
-                                )
-                            }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                                icon = {
+                                    Icon(destination.icon, contentDescription = null)
+                                },
+                                label = { Text(stringResource(destination.labelRes)) },
+                            )
                         }
                     }
                 },

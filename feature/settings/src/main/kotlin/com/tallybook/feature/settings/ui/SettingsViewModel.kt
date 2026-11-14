@@ -29,7 +29,7 @@ data class SettingsUiState(
     /** Whether the OS currently allows this app to post notifications. */
     val notificationsPermitted: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val uiStyle: UiStyle = UiStyle.GLASS,
+    val uiStyle: UiStyle = UiStyle.SIMPLE,
     /** Non-null while the import confirmation dialog is showing. */
     val importPreview: ImportPreview? = null,
 )

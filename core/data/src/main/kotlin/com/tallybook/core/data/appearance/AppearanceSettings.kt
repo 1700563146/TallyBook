@@ -27,7 +27,7 @@ class AppearanceSettings @Inject constructor(
                 ?: ThemeMode.SYSTEM,
             uiStyle = values[KEY_UI_STYLE]
                 ?.let { runCatching { UiStyle.valueOf(it) }.getOrNull() }
-                ?: UiStyle.GLASS,
+                ?: UiStyle.SIMPLE,
         )
     }
 
