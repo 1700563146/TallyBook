@@ -191,6 +191,14 @@ private fun BudgetCard(progress: BudgetProgress, onClick: () -> Unit = {}) {
                 )
             }
 
+            if (progress.categoryId != null && progress.includeSubcategories) {
+                Text(
+                    "含子分类",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+
             LinearProgressIndicator(
                 progress = { progress.progress },
                 modifier = Modifier

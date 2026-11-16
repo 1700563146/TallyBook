@@ -191,6 +191,46 @@ interface TransactionDao {
     @Query("UPDATE transactions SET deleted_at = NULL, updated_at = :restoredAt WHERE id = :id")
     suspend fun restore(id: String, restoredAt: Long)
 
+    /**
+     * Soft-deletes a whole selection in one statement.
+     *
+     * `deleted_at IS NULL` keeps an already-deleted row's original deletion timestamp, so a repeated
+     * request cannot move an older recycle-bin item to "just deleted". The statement itself is
+     * atomic; the default wrappers below also make the empty-selection guard part of Room's
+     * transaction boundary.
+     */
+    @Query(
+        """
+        UPDATE transactions
+        SET deleted_at = :deletedAt, updated_at = :deletedAt
+        WHERE id IN (:ids) AND deleted_at IS NULL
+        """,
+    )
+    suspend fun softDeleteManyQuery(ids: List<String>, deletedAt: Long): Int
+
+    @Transaction
+    suspend fun softDeleteMany(ids: List<String>, deletedAt: Long): Int {
+        val distinctIds = ids.distinct()
+        if (distinctIds.isEmpty()) return 0
+        return softDeleteManyQuery(distinctIds, deletedAt)
+    }
+
+    @Query(
+        """
+        UPDATE transactions
+        SET deleted_at = NULL, updated_at = :restoredAt
+        WHERE id IN (:ids) AND deleted_at IS NOT NULL
+        """,
+    )
+    suspend fun restoreManyQuery(ids: List<String>, restoredAt: Long): Int
+
+    @Transaction
+    suspend fun restoreMany(ids: List<String>, restoredAt: Long): Int {
+        val distinctIds = ids.distinct()
+        if (distinctIds.isEmpty()) return 0
+        return restoreManyQuery(distinctIds, restoredAt)
+    }
+
     /** Hard delete only for the explicit "empty trash" action, which is irreversible by design. */
     @Query("DELETE FROM transactions WHERE deleted_at IS NOT NULL AND deleted_at < :before")
     suspend fun purgeDeletedBefore(before: Long)

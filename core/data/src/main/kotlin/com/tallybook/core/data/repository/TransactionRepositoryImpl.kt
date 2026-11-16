@@ -173,6 +173,16 @@ class TransactionRepositoryImpl @Inject constructor(
         transactionDao.restore(id, clock.nowMillis())
     }
 
+    override suspend fun deleteMany(ids: Set<String>) {
+        if (ids.isEmpty()) return
+        transactionDao.softDeleteMany(ids = ids.toList(), deletedAt = clock.nowMillis())
+    }
+
+    override suspend fun restoreMany(ids: Set<String>) {
+        if (ids.isEmpty()) return
+        transactionDao.restoreMany(ids = ids.toList(), restoredAt = clock.nowMillis())
+    }
+
     override fun observePeriodTotals(fromInclusive: Long, toExclusive: Long): Flow<PeriodTotals> =
         transactionDao.observePeriodTotals(fromInclusive, toExclusive).map { row ->
             PeriodTotals(

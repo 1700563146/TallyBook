@@ -18,6 +18,9 @@ data class BudgetEditorUiState(
     val categoryId: String? = null,
     val categories: List<BudgetCategoryOption> = emptyList(),
     val includeSubcategories: Boolean = true,
+    val subcategoryDialog: SubcategoryDialogUi? = null,
+    val categoryError: String? = null,
+    val isCreatingCategory: Boolean = false,
     val isEditing: Boolean = false,
     val isSaving: Boolean = false,
     val error: String? = null,
@@ -26,11 +29,30 @@ data class BudgetEditorUiState(
         get() = name.isNotBlank() && (limitText.toBigDecimalOrNull()?.signum() ?: 0) > 0
 
     val isAllCategories: Boolean get() = categoryId == null
+
+    val selectedCategory: BudgetCategoryOption?
+        get() = categories.firstOrNull { it.id == categoryId }
 }
 
 data class BudgetCategoryOption(
     val id: String,
     val name: String,
+    val parentId: String?,
+    val depth: Int,
+    val childCount: Int,
+    val sortOrder: Int,
+    val iconKey: String?,
+    val colorArgb: Long?,
+) {
+    val displayName: String
+        get() = if (depth == 0) name else "↳ $name"
+
+    val isParent: Boolean get() = childCount > 0
+}
+
+data class SubcategoryDialogUi(
+    /** The selected category when it can be a parent, otherwise its parent. */
+    val defaultParentId: String?,
 )
 
 private fun String.toBigDecimalOrNull(): java.math.BigDecimal? =

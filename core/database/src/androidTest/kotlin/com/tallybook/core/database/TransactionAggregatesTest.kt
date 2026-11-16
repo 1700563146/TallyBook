@@ -252,6 +252,46 @@ class TransactionAggregatesTest {
     }
 
     @Test
+    fun bulk_delete_and_restore_treat_the_selection_as_one_operation() = runTest {
+        val first = tx(
+            type = TransactionType.EXPENSE,
+            amountMinor = 1_200,
+            accountId = accountA,
+            categoryId = categoryFood,
+        )
+        val second = tx(
+            type = TransactionType.EXPENSE,
+            amountMinor = 3_400,
+            accountId = accountA,
+            categoryId = categoryFood,
+        )
+        val untouched = tx(
+            type = TransactionType.EXPENSE,
+            amountMinor = 5_600,
+            accountId = accountA,
+            categoryId = categoryFood,
+        )
+        db.transactionDao().upsertAll(listOf(first, second, untouched))
+
+        val deleted = db.transactionDao().softDeleteMany(
+            ids = listOf(first.id, second.id, second.id),
+            deletedAt = now,
+        )
+
+        assertEquals(2, deleted)
+        assertEquals(1, db.transactionDao().observeInRange(now - 1, now + 1).first().size)
+        assertEquals(untouched.id, db.transactionDao().observeInRange(now - 1, now + 1).first().single().id)
+
+        val restored = db.transactionDao().restoreMany(
+            ids = listOf(first.id, second.id),
+            restoredAt = now + 1,
+        )
+
+        assertEquals(2, restored)
+        assertEquals(3, db.transactionDao().observeInRange(now - 1, now + 1).first().size)
+    }
+
+    @Test
     fun budget_spend_is_net_of_refunds() = runTest {
         val original = tx(
             type = TransactionType.EXPENSE,
@@ -278,6 +318,53 @@ class TransactionAggregatesTest {
         )
 
         assertEquals(7_000L, spent)
+    }
+
+    @Test
+    fun parent_budget_can_include_child_category_spending() = runTest {
+        val childId = "cat-breakfast"
+        db.categoryDao().upsert(
+            CategoryEntity(
+                id = childId,
+                name = "早餐",
+                type = TransactionType.EXPENSE,
+                parentId = categoryFood,
+            ),
+        )
+        db.transactionDao().upsertAll(
+            listOf(
+                tx(
+                    type = TransactionType.EXPENSE,
+                    amountMinor = 4_000,
+                    accountId = accountA,
+                    categoryId = categoryFood,
+                ),
+                tx(
+                    type = TransactionType.EXPENSE,
+                    amountMinor = 6_000,
+                    accountId = accountA,
+                    categoryId = childId,
+                ),
+            ),
+        )
+
+        val subtree = db.categoryDao().subtreeIds(categoryFood)
+        val withChildren = db.transactionDao().spentInPeriod(
+            fromInclusive = now - 1,
+            toExclusive = now + 1,
+            categoryId = categoryFood,
+            categoryIds = subtree,
+        )
+        val parentOnly = db.transactionDao().spentInPeriod(
+            fromInclusive = now - 1,
+            toExclusive = now + 1,
+            categoryId = categoryFood,
+            categoryIds = listOf(categoryFood),
+        )
+
+        assertEquals(setOf(categoryFood, childId), subtree.toSet())
+        assertEquals(10_000L, withChildren)
+        assertEquals(4_000L, parentOnly)
     }
 
     @Test

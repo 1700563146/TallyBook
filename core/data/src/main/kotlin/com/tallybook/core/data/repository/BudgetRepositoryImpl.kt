@@ -121,6 +121,8 @@ class BudgetRepositoryImpl @Inject constructor(
             daysElapsed = daysElapsed,
             daysTotal = daysTotal,
             projectedOverrun = projectOverrun(spent, budget.limit, daysElapsed, daysTotal),
+            categoryId = budget.categoryId,
+            includeSubcategories = budget.includeSubcategories,
         )
     }
 

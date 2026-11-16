@@ -101,6 +101,15 @@ class TransactionsViewModel @Inject constructor(
                             miniChart = buildMiniChart(snapshot.daily),
                             budgetCards = buildBudgetCards(snapshot.budgets),
                             isLoading = false,
+                            selectedIds = if (current.isSelectionMode) {
+                                current.selectedIds.intersect(
+                                    snapshot.items.mapTo(mutableSetOf()) {
+                                        it.transaction.id.value
+                                    },
+                                )
+                            } else {
+                                emptySet()
+                            },
                         )
                     }
                 }
@@ -188,31 +197,94 @@ class TransactionsViewModel @Inject constructor(
         anchor.value = clock.nowMillis()
     }
 
-    fun delete(id: String) {
+    fun startSelection(initialId: String? = null) {
+        _uiState.update {
+            it.copy(
+                isSelectionMode = true,
+                selectedIds = initialId?.let(::setOf).orEmpty(),
+            )
+        }
+    }
+
+    fun cancelSelection() {
+        _uiState.update { it.copy(isSelectionMode = false, selectedIds = emptySet()) }
+    }
+
+    fun toggleSelection(id: String) {
+        _uiState.update { current ->
+            val selected = current.selectedIds.toMutableSet()
+            if (!selected.add(id)) selected.remove(id)
+            current.copy(selectedIds = selected)
+        }
+    }
+
+    fun selectAllVisible() {
+        _uiState.update { it.copy(selectedIds = it.visibleIds) }
+    }
+
+    fun clearSelection() {
+        _uiState.update { it.copy(selectedIds = emptySet()) }
+    }
+
+    fun deleteSelected() {
+        val ids = _uiState.value.selectedIds
+        if (ids.isEmpty() || _uiState.value.isDeleting) return
+
         viewModelScope.launch {
-            transactionRepository.delete(id)
-            _uiState.update {
-                it.copy(undoMessage = "已删除这笔记录", undoTransactionId = id)
-            }
+            _uiState.update { it.copy(isDeleting = true) }
+            runCatching { transactionRepository.deleteMany(ids) }
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(
+                            isSelectionMode = false,
+                            selectedIds = emptySet(),
+                            isDeleting = false,
+                            undoMessage = "已删除 ${ids.size} 笔记录",
+                            undoTransactionIds = ids,
+                            undoRequestId = it.undoRequestId + 1,
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            isDeleting = false,
+                            undoMessage = error.message ?: "批量删除失败",
+                            undoTransactionIds = emptySet(),
+                            undoRequestId = it.undoRequestId + 1,
+                        )
+                    }
+                }
         }
     }
 
     fun undoDelete() {
-        val id = _uiState.value.undoTransactionId ?: return
+        val ids = _uiState.value.undoTransactionIds
+        if (ids.isEmpty()) return
         viewModelScope.launch {
-            transactionRepository.restore(id)
-            _uiState.update {
-                it.copy(
-                    undoMessage = null,
-                    undoTransactionId = null,
-                    scrollToTopTick = it.scrollToTopTick + 1,
-                )
-            }
+            runCatching { transactionRepository.restoreMany(ids) }
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(
+                            undoMessage = null,
+                            undoTransactionIds = emptySet(),
+                            scrollToTopTick = it.scrollToTopTick + 1,
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            undoMessage = error.message ?: "恢复失败，请重试",
+                            undoRequestId = it.undoRequestId + 1,
+                        )
+                    }
+                }
         }
     }
 
     fun onSnackbarShown() {
-        _uiState.update { it.copy(undoMessage = null, undoTransactionId = null) }
+        _uiState.update { it.copy(undoMessage = null, undoTransactionIds = emptySet()) }
     }
 
     private fun groupByDay(items: List<TransactionListItem>): List<DayGroupUi> =

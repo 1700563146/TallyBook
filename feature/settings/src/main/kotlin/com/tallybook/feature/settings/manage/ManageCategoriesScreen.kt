@@ -3,6 +3,8 @@ package com.tallybook.feature.settings.manage
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,6 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -18,6 +22,7 @@ import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,7 +52,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tallybook.core.model.transaction.TransactionType
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ManageCategoriesScreen(
     onBack: () -> Unit,
@@ -113,13 +118,18 @@ fun ManageCategoriesScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { viewModel.startRename(row) }
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            .padding(
+                                start = (16 + row.depth * 24).dp,
+                                end = 8.dp,
+                                top = 12.dp,
+                                bottom = 12.dp,
+                            ),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                row.name,
+                                if (row.depth > 0) "↳ ${row.name}" else row.name,
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = if (row.isArchived) {
                                     MaterialTheme.colorScheme.onSurfaceVariant
@@ -128,10 +138,25 @@ fun ManageCategoriesScreen(
                                 },
                             )
                             Text(
-                                if (row.isArchived) "已归档 · ${row.usageLabel}" else row.usageLabel,
+                                buildString {
+                                    if (row.depth > 0) append("子分类 · ")
+                                    append(if (row.isArchived) "已归档" else row.usageLabel)
+                                    if (row.isArchived) append(" · ${row.usageLabel}")
+                                    if (row.childCount > 0) append(" · ${row.childCount} 个子分类")
+                                },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                        }
+                        if (row.depth == 0 && !row.isArchived) {
+                            IconButton(onClick = { viewModel.startAdd(row.id) }) {
+                                Icon(
+                                    Icons.Filled.Add,
+                                    contentDescription = "在「${row.name}」下添加子分类",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                         }
                         IconButton(onClick = { viewModel.toggleArchive(row) }) {
                             Icon(
@@ -149,21 +174,72 @@ fun ManageCategoriesScreen(
     }
 
     state.editing?.let { dialog ->
-        var name by remember(dialog.categoryId) { mutableStateOf(dialog.initialName) }
+        var name by remember(dialog) { mutableStateOf(dialog.initialName) }
+        var parentId by remember(dialog) { mutableStateOf(dialog.parentId) }
+        val editingRow = dialog.categoryId?.let { id ->
+            state.categories.firstOrNull { it.id == id }
+        }
+        val canChooseParent = editingRow?.childCount?.let { it == 0 } ?: true
+        val parentOptions = state.categories.filter {
+            it.depth == 0 &&
+                it.id != dialog.categoryId &&
+                (!it.isArchived || it.id == dialog.parentId)
+        }
         AlertDialog(
             onDismissRequest = viewModel::dismissDialog,
-            title = { Text(if (dialog.isNew) "新建分类" else "重命名分类") },
-            text = {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("名称") },
-                    singleLine = true,
+            title = {
+                Text(
+                    when {
+                        dialog.isNew && parentId != null -> "新建子分类"
+                        dialog.isNew -> "新建分类"
+                        else -> "编辑分类"
+                    },
                 )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("名称") },
+                        singleLine = true,
+                    )
+                    if (canChooseParent) {
+                        Text("上级分类", style = MaterialTheme.typography.labelMedium)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = parentId == null,
+                                onClick = { parentId = null },
+                                label = { Text("顶级分类") },
+                            )
+                            parentOptions.forEach { parent ->
+                                FilterChip(
+                                    selected = parentId == parent.id,
+                                    onClick = { parentId = parent.id },
+                                    label = {
+                                        Text(
+                                            parent.name +
+                                                if (parent.isArchived) "（已归档）" else "",
+                                        )
+                                    },
+                                )
+                            }
+                        }
+                    } else {
+                        Text(
+                            "这个分类已有子分类，需保留为顶级分类。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             },
             confirmButton = {
                 TextButton(
-                    onClick = { viewModel.submit(name) },
+                    onClick = { viewModel.submit(name, parentId) },
                     enabled = name.isNotBlank(),
                 ) { Text("保存") }
             },

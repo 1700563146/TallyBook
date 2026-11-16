@@ -21,9 +21,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -34,6 +38,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
@@ -63,10 +68,11 @@ import com.tallybook.core.ui.components.tallyCardElevation
  *
  * Interaction contract:
  * - tap a row -> edit
- * - long-press a row -> delete, with an undo snackbar
+ * - long-press or the checklist action -> enter multi-select
+ * - delete the selection -> one confirmation, followed by one undo action for the whole batch
  *
- * Long-press rather than swipe: swipe-to-delete needs a visible affordance to be discoverable, and
- * on a ledger row it fights with horizontal month navigation gestures.
+ * Long-press no longer deletes immediately: making it enter selection mode prevents an accidental
+ * single-row deletion and teaches the bulk workflow without adding another permanent toolbar.
  */
 @Composable
 fun TransactionsScreen(
@@ -91,7 +97,12 @@ fun TransactionsScreen(
         onEditClick = onEditClick,
         onOpenInsights = onOpenInsights,
         onOpenSearch = onOpenSearch,
-        onDeleteClick = viewModel::delete,
+        onStartSelection = viewModel::startSelection,
+        onCancelSelection = viewModel::cancelSelection,
+        onToggleSelection = viewModel::toggleSelection,
+        onSelectAll = viewModel::selectAllVisible,
+        onClearSelection = viewModel::clearSelection,
+        onDeleteSelected = viewModel::deleteSelected,
         onPreviousMonth = viewModel::showPreviousMonth,
         onNextMonth = viewModel::showNextMonth,
         onUndo = viewModel::undoDelete,
@@ -112,7 +123,12 @@ fun TransactionsContent(
     state: TransactionsUiState,
     onAddClick: () -> Unit,
     onEditClick: (String) -> Unit,
-    onDeleteClick: (String) -> Unit,
+    onStartSelection: (String?) -> Unit,
+    onCancelSelection: () -> Unit,
+    onToggleSelection: (String) -> Unit,
+    onSelectAll: () -> Unit,
+    onClearSelection: () -> Unit,
+    onDeleteSelected: () -> Unit,
     onOpenInsights: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onPreviousMonth: () -> Unit,
@@ -123,23 +139,23 @@ fun TransactionsContent(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var confirmBulkDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.scrollToTopTick) {
         if (state.scrollToTopTick > 0) listState.animateScrollToItem(0)
     }
 
-    LaunchedEffect(state.undoMessage) {
+    LaunchedEffect(state.undoMessage, state.undoRequestId) {
         val message = state.undoMessage ?: return@LaunchedEffect
         val result = snackbarHostState.showSnackbar(
             message = message,
-            actionLabel = "撤销",
+            actionLabel = "撤销".takeIf { state.undoTransactionIds.isNotEmpty() },
             withDismissAction = true,
         )
         when (result) {
             SnackbarResult.ActionPerformed -> onUndo()
             SnackbarResult.Dismissed -> onSnackbarShown()
         }
-        onSnackbarShown()
     }
 
     Scaffold(
@@ -147,8 +163,10 @@ fun TransactionsContent(
         containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddClick) {
-                Icon(Icons.Filled.Add, contentDescription = "记一笔")
+            if (!state.isSelectionMode) {
+                FloatingActionButton(onClick = onAddClick) {
+                    Icon(Icons.Filled.Add, contentDescription = "记一笔")
+                }
             }
         },
     ) { innerPadding ->
@@ -164,14 +182,29 @@ fun TransactionsContent(
                 onPrevious = onPreviousMonth,
                 onNext = onNextMonth,
                 onSearch = onOpenSearch,
+                isSelectionMode = state.isSelectionMode,
+                onStartSelection = { onStartSelection(null) },
             )
 
-            if (state.budgetCards.isNotEmpty()) {
-                BudgetSummaryRow(cards = state.budgetCards)
-            }
+            if (state.isSelectionMode) {
+                SelectionBar(
+                    selectedCount = state.selectedCount,
+                    allVisibleSelected = state.allVisibleSelected,
+                    isDeleting = state.isDeleting,
+                    onToggleAll = {
+                        if (state.allVisibleSelected) onClearSelection() else onSelectAll()
+                    },
+                    onCancel = onCancelSelection,
+                    onDelete = { confirmBulkDelete = true },
+                )
+            } else {
+                if (state.budgetCards.isNotEmpty()) {
+                    BudgetSummaryRow(cards = state.budgetCards)
+                }
 
-            if (state.miniChart.isNotEmpty()) {
-                MiniChartCard(bars = state.miniChart, onClick = onOpenInsights)
+                if (state.miniChart.isNotEmpty()) {
+                    MiniChartCard(bars = state.miniChart, onClick = onOpenInsights)
+                }
             }
 
             when {
@@ -181,10 +214,34 @@ fun TransactionsContent(
                     groups = state.groups,
                     listState = listState,
                     onEditClick = onEditClick,
-                    onDeleteClick = onDeleteClick,
+                    isSelectionMode = state.isSelectionMode,
+                    selectedIds = state.selectedIds,
+                    onStartSelection = onStartSelection,
+                    onToggleSelection = onToggleSelection,
                 )
             }
         }
+    }
+
+    if (confirmBulkDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmBulkDelete = false },
+            title = { Text("删除选中的 ${state.selectedCount} 笔记录？") },
+            text = { Text("记录会移入最近删除，并可在提示中整批撤销。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmBulkDelete = false
+                        onDeleteSelected()
+                    },
+                ) {
+                    Text("删除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmBulkDelete = false }) { Text("取消") }
+            },
+        )
     }
 }
 
@@ -327,6 +384,62 @@ private fun MiniChartCard(bars: List<MiniBarUi>, onClick: () -> Unit) {
 }
 
 @Composable
+private fun SelectionBar(
+    selectedCount: Int,
+    allVisibleSelected: Boolean,
+    isDeleting: Boolean,
+    onToggleAll: () -> Unit,
+    onCancel: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .tallyCardDecoration(),
+        shape = MaterialTheme.shapes.large,
+        colors = tallyCardColors(MaterialTheme.colorScheme.secondaryContainer),
+        elevation = tallyCardElevation(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "已选择 $selectedCount 笔",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "点击记录切换选择",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(onClick = onToggleAll) {
+                Text(if (allVisibleSelected) "取消全选" else "全选")
+            }
+            TextButton(onClick = onCancel) {
+                Text("取消")
+            }
+            Button(
+                onClick = onDelete,
+                enabled = selectedCount > 0 && !isDeleting,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+            ) {
+                Text(if (isDeleting) "删除中" else "删除")
+            }
+        }
+    }
+}
+
+@Composable
 private fun MonthHeader(
     monthLabel: String,
     expenseTotal: String,
@@ -334,6 +447,8 @@ private fun MonthHeader(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onSearch: () -> Unit,
+    isSelectionMode: Boolean,
+    onStartSelection: () -> Unit,
 ) {
     Card(
         modifier = Modifier
@@ -346,7 +461,7 @@ private fun MonthHeader(
     ) {
       Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onPrevious) {
+            IconButton(onClick = onPrevious, enabled = !isSelectionMode) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "上个月")
             }
             Text(
@@ -355,11 +470,16 @@ private fun MonthHeader(
                 modifier = Modifier.weight(1f),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
-            IconButton(onClick = onNext) {
+            IconButton(onClick = onNext, enabled = !isSelectionMode) {
                 Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "下个月")
             }
             IconButton(onClick = onSearch) {
                 Icon(Icons.Filled.Search, contentDescription = "搜索与筛选")
+            }
+            if (!isSelectionMode) {
+                IconButton(onClick = onStartSelection) {
+                    Icon(Icons.Filled.Checklist, contentDescription = "批量选择")
+                }
             }
         }
 
@@ -394,7 +514,10 @@ private fun DayGroupList(
     groups: List<DayGroupUi>,
     listState: androidx.compose.foundation.lazy.LazyListState,
     onEditClick: (String) -> Unit,
-    onDeleteClick: (String) -> Unit,
+    isSelectionMode: Boolean,
+    selectedIds: Set<String>,
+    onStartSelection: (String?) -> Unit,
+    onToggleSelection: (String) -> Unit,
 ) {
     LazyColumn(
         state = listState,
@@ -419,8 +542,18 @@ private fun DayGroupList(
             items(group.items, key = { it.id }) { row ->
                 TransactionRow(
                     row = row,
-                    onClick = { onEditClick(row.id) },
-                    onLongClick = { onDeleteClick(row.id) },
+                    isSelectionMode = isSelectionMode,
+                    isSelected = row.id in selectedIds,
+                    onClick = {
+                        if (isSelectionMode) onToggleSelection(row.id) else onEditClick(row.id)
+                    },
+                    onLongClick = {
+                        if (isSelectionMode) {
+                            onToggleSelection(row.id)
+                        } else {
+                            onStartSelection(row.id)
+                        }
+                    },
                 )
             }
         }
@@ -431,6 +564,8 @@ private fun DayGroupList(
 @Composable
 private fun TransactionRow(
     row: TransactionRowUi,
+    isSelectionMode: Boolean,
+    isSelected: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
@@ -440,7 +575,13 @@ private fun TransactionRow(
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .tallyCardDecoration(),
         shape = MaterialTheme.shapes.medium,
-        colors = tallyCardColors(),
+        colors = tallyCardColors(
+            accentContainer = if (isSelected) {
+                MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                null
+            },
+        ),
         elevation = tallyCardElevation(),
     ) {
         Row(
@@ -448,6 +589,12 @@ private fun TransactionRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (isSelectionMode) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onClick() },
+                )
+            }
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -554,7 +701,12 @@ private fun TransactionsContentPreview() {
         ),
         onAddClick = {},
         onEditClick = {},
-        onDeleteClick = {},
+        onStartSelection = {},
+        onCancelSelection = {},
+        onToggleSelection = {},
+        onSelectAll = {},
+        onClearSelection = {},
+        onDeleteSelected = {},
         onPreviousMonth = {},
         onNextMonth = {},
         onUndo = {},

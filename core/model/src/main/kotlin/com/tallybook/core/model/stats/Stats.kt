@@ -125,6 +125,10 @@ data class BudgetProgress(
     val daysElapsed: Int,
     val daysTotal: Int,
     val projectedOverrun: Money? = null,
+    /** Category scope used to calculate this progress, if it is not an all-category budget. */
+    val categoryId: String? = null,
+    /** True when spending in descendant categories rolls up into this budget. */
+    val includeSubcategories: Boolean = true,
 ) {
     /** True overrun (can exceed 1), used to show "超出 ¥32.50". */
     val overrun: Money get() = spent.minus(limit)

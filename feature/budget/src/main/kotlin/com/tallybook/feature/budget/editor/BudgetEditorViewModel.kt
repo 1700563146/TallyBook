@@ -9,7 +9,9 @@ import com.tallybook.core.model.money.CurrencyCode
 import com.tallybook.core.model.money.Money
 import com.tallybook.core.model.transaction.Budget
 import com.tallybook.core.model.transaction.BudgetPeriod
+import com.tallybook.core.model.transaction.Category
 import com.tallybook.core.model.transaction.TransactionType
+import com.tallybook.core.model.transaction.toCategoryTree
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,14 +47,30 @@ class BudgetEditorViewModel @Inject constructor(
     private var existing: Budget? = null
 
     init {
-        viewModelScope.launch { load() }
+        viewModelScope.launch { loadBudget() }
+        viewModelScope.launch {
+            categoryRepository.observeActive().collect { categories ->
+                val options = categories
+                    .filter { it.type == TransactionType.EXPENSE && !it.isArchived }
+                    .toCategoryTree()
+                    .map { node ->
+                        BudgetCategoryOption(
+                            id = node.category.id,
+                            name = node.category.name,
+                            parentId = node.category.parentId,
+                            depth = node.depth,
+                            childCount = node.childCount,
+                            sortOrder = node.category.sortOrder,
+                            iconKey = node.category.iconKey,
+                            colorArgb = node.category.colorArgb,
+                        )
+                    }
+                _uiState.update { it.copy(categories = options) }
+            }
+        }
     }
 
-    private suspend fun load() {
-        val categories = categoryRepository.observeActive().first()
-            .filter { it.type == TransactionType.EXPENSE && !it.isArchived }
-            .map { BudgetCategoryOption(it.id, it.name) }
-
+    private suspend fun loadBudget() {
         val budget = budgetId?.let { id ->
             budgetRepository.observeActive().first().firstOrNull { it.id == id }
         }
@@ -67,7 +85,6 @@ class BudgetEditorViewModel @Inject constructor(
                     ?: "",
                 period = budget?.period ?: BudgetPeriod.MONTHLY,
                 categoryId = budget?.categoryId,
-                categories = categories,
                 includeSubcategories = budget?.includeSubcategories ?: true,
             )
         }
@@ -105,6 +122,115 @@ class BudgetEditorViewModel @Inject constructor(
 
     fun onIncludeSubcategoriesChange(value: Boolean) {
         _uiState.update { it.copy(includeSubcategories = value) }
+    }
+
+    fun openSubcategoryDialog() {
+        val selected = _uiState.value.selectedCategory
+        _uiState.update {
+            it.copy(
+                categoryError = null,
+                subcategoryDialog = SubcategoryDialogUi(
+                    defaultParentId = when {
+                        selected == null -> null
+                        selected.depth == 0 -> selected.id
+                        else -> selected.parentId
+                    },
+                ),
+            )
+        }
+    }
+
+    fun dismissSubcategoryDialog() {
+        _uiState.update {
+            it.copy(subcategoryDialog = null, categoryError = null, isCreatingCategory = false)
+        }
+    }
+
+    /**
+     * Creates a child category as part of the budget flow.
+     *
+     * A null [parentId] deliberately means a top-level category, which is useful when the user has
+     * not created any expense categories yet. The two-level cap matches the domain model and keeps
+     * every parent picker unambiguous.
+     */
+    fun createSubcategory(name: String, parentId: String?) {
+        val trimmed = name.trim()
+        val current = _uiState.value
+        if (trimmed.isEmpty()) {
+            _uiState.update { it.copy(categoryError = "请输入子分类名称") }
+            return
+        }
+        if (current.isCreatingCategory) return
+
+        val parent = parentId?.let { id ->
+            current.categories.firstOrNull { it.id == id && it.depth == 0 }
+        }
+        if (parentId != null && parent == null) {
+            _uiState.update { it.copy(categoryError = "只能把顶级分类设为上级分类") }
+            return
+        }
+        val duplicate = current.categories.any {
+            it.parentId == parentId && it.name.equals(trimmed, ignoreCase = true)
+        }
+        if (duplicate) {
+            _uiState.update { it.copy(categoryError = "这个上级分类下已经有同名分类") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCreatingCategory = true, categoryError = null) }
+            val allCategories = categoryRepository.observeAll().first()
+            val allDuplicate = allCategories.any {
+                it.type == TransactionType.EXPENSE &&
+                    it.parentId == parentId &&
+                    it.name.equals(trimmed, ignoreCase = true)
+            }
+            if (allDuplicate) {
+                _uiState.update {
+                    it.copy(
+                        isCreatingCategory = false,
+                        categoryError = "这个上级分类下已经有同名分类",
+                    )
+                }
+                return@launch
+            }
+            val siblingOrder = allCategories
+                .filter { it.type == TransactionType.EXPENSE && it.parentId == parentId }
+                .maxOfOrNull { it.sortOrder }
+                ?.plus(1)
+                ?: 0
+            val category = Category(
+                id = UUID.randomUUID().toString(),
+                name = trimmed,
+                type = TransactionType.EXPENSE,
+                parentId = parentId,
+                iconKey = parent?.iconKey,
+                colorArgb = parent?.colorArgb,
+                sortOrder = siblingOrder,
+            )
+            runCatching { categoryRepository.upsert(category) }
+                .onSuccess {
+                    _uiState.update {
+                        val adoptName = it.name.isBlank() || it.name.trim() == parent?.name
+                        it.copy(
+                            name = if (adoptName) trimmed else it.name,
+                            categoryId = category.id,
+                            includeSubcategories = true,
+                            subcategoryDialog = null,
+                            categoryError = null,
+                            isCreatingCategory = false,
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(
+                            isCreatingCategory = false,
+                            categoryError = error.message ?: "创建分类失败",
+                        )
+                    }
+                }
+        }
     }
 
     fun save() {

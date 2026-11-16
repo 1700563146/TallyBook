@@ -115,6 +115,8 @@ private class FakeTransactionRepository : TransactionRepository {
     override suspend fun upsert(transaction: Transaction) = Unit
     override suspend fun delete(id: String) = Unit
     override suspend fun restore(id: String) = Unit
+    override suspend fun deleteMany(ids: Set<String>) = Unit
+    override suspend fun restoreMany(ids: Set<String>) = Unit
 
     override fun observePeriodTotals(
         fromInclusive: Long,

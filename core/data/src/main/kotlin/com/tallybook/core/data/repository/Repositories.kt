@@ -121,6 +121,12 @@ interface TransactionRepository {
 
     suspend fun restore(id: String)
 
+    /** Atomically soft-deletes [ids], so a bulk action cannot leave a partially updated selection. */
+    suspend fun deleteMany(ids: Set<String>)
+
+    /** Atomically restores [ids], used by the bulk-delete undo action. */
+    suspend fun restoreMany(ids: Set<String>)
+
     fun observePeriodTotals(fromInclusive: Long, toExclusive: Long): Flow<PeriodTotals>
 }
 

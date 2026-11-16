@@ -6,6 +6,7 @@ import com.tallybook.core.common.clock.Clock
 import com.tallybook.core.data.repository.CategoryRepository
 import com.tallybook.core.model.transaction.Category
 import com.tallybook.core.model.transaction.TransactionType
+import com.tallybook.core.model.transaction.toCategoryTree
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +22,9 @@ import javax.inject.Inject
 data class CategoryRowUi(
     val id: String,
     val name: String,
+    val parentId: String?,
+    val depth: Int,
+    val childCount: Int,
     val usageLabel: String,
     val isArchived: Boolean,
 )
@@ -36,6 +40,7 @@ data class ManageCategoriesUiState(
 data class CategoryEditDialog(
     val categoryId: String?,
     val initialName: String,
+    val parentId: String?,
     val isNew: Boolean,
 )
 
@@ -73,12 +78,16 @@ class ManageCategoriesViewModel @Inject constructor(
                 selectedType,
             ) { all, usage, type ->
                 all.filter { it.type == type }
-                    .sortedWith(compareBy({ it.isArchived }, { it.sortOrder }, { it.name }))
-                    .map { category ->
+                    .toCategoryTree()
+                    .map { node ->
+                        val category = node.category
                         val count = usage[category.id] ?: 0
                         CategoryRowUi(
                             id = category.id,
                             name = category.name,
+                            parentId = category.parentId,
+                            depth = node.depth,
+                            childCount = node.childCount,
                             usageLabel = if (count > 0) "$count 笔" else "未使用",
                             isArchived = category.isArchived,
                         )
@@ -93,13 +102,29 @@ class ManageCategoriesViewModel @Inject constructor(
         selectedType.value = type
     }
 
-    fun startAdd() {
-        _uiState.update { it.copy(editing = CategoryEditDialog(null, "", isNew = true)) }
+    fun startAdd(parentId: String? = null) {
+        _uiState.update {
+            it.copy(
+                editing = CategoryEditDialog(
+                    categoryId = null,
+                    initialName = "",
+                    parentId = parentId,
+                    isNew = true,
+                ),
+            )
+        }
     }
 
     fun startRename(row: CategoryRowUi) {
         _uiState.update {
-            it.copy(editing = CategoryEditDialog(row.id, row.name, isNew = false))
+            it.copy(
+                editing = CategoryEditDialog(
+                    categoryId = row.id,
+                    initialName = row.name,
+                    parentId = row.parentId,
+                    isNew = false,
+                ),
+            )
         }
     }
 
@@ -107,7 +132,7 @@ class ManageCategoriesViewModel @Inject constructor(
         _uiState.update { it.copy(editing = null) }
     }
 
-    fun submit(name: String) {
+    fun submit(name: String, parentId: String?) {
         val editing = _uiState.value.editing ?: return
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
@@ -118,6 +143,7 @@ class ManageCategoriesViewModel @Inject constructor(
             val duplicate = existing.any {
                 it.type == _uiState.value.type &&
                     it.name == trimmed &&
+                    it.parentId == parentId &&
                     it.id != editing.categoryId
             }
             if (duplicate) {
@@ -126,14 +152,40 @@ class ManageCategoriesViewModel @Inject constructor(
             }
 
             val original = existing.firstOrNull { it.id == editing.categoryId }
+            val chosenParent = parentId?.let { id -> existing.firstOrNull { it.id == id } }
+            if (parentId != null) {
+                val originalHasChildren = existing.any { it.parentId == editing.categoryId }
+                if (
+                    chosenParent == null ||
+                    chosenParent.type != _uiState.value.type ||
+                    chosenParent.parentId != null
+                ) {
+                    _uiState.update { it.copy(message = "只能选择同级分类作为上级分类") }
+                    return@launch
+                }
+                if (originalHasChildren) {
+                    _uiState.update {
+                        it.copy(message = "这个分类还有子分类，不能移动到其他分类下")
+                    }
+                    return@launch
+                }
+            }
             val category = Category(
                 id = editing.categoryId ?: UUID.randomUUID().toString(),
                 name = trimmed,
                 type = original?.type ?: _uiState.value.type,
-                parentId = original?.parentId,
-                iconKey = original?.iconKey,
-                colorArgb = original?.colorArgb,
-                sortOrder = original?.sortOrder ?: 0,
+                parentId = parentId,
+                iconKey = original?.iconKey ?: chosenParent?.iconKey,
+                colorArgb = original?.colorArgb ?: chosenParent?.colorArgb,
+                sortOrder = if (original == null || original.parentId != parentId) {
+                    existing
+                        .filter { it.parentId == parentId }
+                        .maxOfOrNull { it.sortOrder }
+                        ?.plus(1)
+                        ?: 0
+                } else {
+                    original.sortOrder
+                },
                 isArchived = original?.isArchived ?: false,
             )
             categoryRepository.upsert(category)
@@ -151,6 +203,12 @@ class ManageCategoriesViewModel @Inject constructor(
         viewModelScope.launch {
             val category = categoryRepository.observeAll().first()
                 .firstOrNull { it.id == row.id } ?: return@launch
+            if (!category.isArchived && row.childCount > 0) {
+                _uiState.update {
+                    it.copy(message = "请先把子分类移到顶级分类，再归档这个父分类")
+                }
+                return@launch
+            }
             categoryRepository.upsert(category.copy(isArchived = !category.isArchived))
             _uiState.update {
                 it.copy(

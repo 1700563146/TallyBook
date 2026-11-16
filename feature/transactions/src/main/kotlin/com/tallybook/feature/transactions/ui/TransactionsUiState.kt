@@ -17,12 +17,18 @@ data class TransactionsUiState(
     /** Budget summaries shown above the chart; empty when the user has no budgets. */
     val budgetCards: List<BudgetCardUi> = emptyList(),
     val isLoading: Boolean = true,
+    /** Multi-select mode used by the bulk-delete action. */
+    val isSelectionMode: Boolean = false,
+    val selectedIds: Set<String> = emptySet(),
+    val isDeleting: Boolean = false,
     /**
-     * Snackbar message after a delete, plus the id to undo. Kept in state (not a one-shot event)
+     * Snackbar message after a delete, plus the ids to undo. Kept in state (not a one-shot event)
      * because the undo window must survive a recomposition during the snackbar's lifetime.
      */
     val undoMessage: String? = null,
-    val undoTransactionId: String? = null,
+    val undoTransactionIds: Set<String> = emptySet(),
+    /** Makes consecutive snackbar requests distinct even when their messages are identical. */
+    val undoRequestId: Int = 0,
     /**
      * Incremented whenever the list should jump back to the top.
      *
@@ -32,6 +38,11 @@ data class TransactionsUiState(
     val scrollToTopTick: Int = 0,
 ) {
     val isEmpty: Boolean get() = groups.isEmpty()
+    val selectedCount: Int get() = selectedIds.size
+    val visibleIds: Set<String>
+        get() = groups.flatMapTo(mutableSetOf()) { group -> group.items.map { it.id } }
+    val allVisibleSelected: Boolean
+        get() = visibleIds.isNotEmpty() && selectedIds.containsAll(visibleIds)
 }
 
 /** One day of the ledger, with its own header totals. */

@@ -2,6 +2,25 @@
 
 All notable changes to TallyBook are documented here.
 
+## v0.1.2-beta.1 - 2026-11-16
+
+### Added
+
+- Ledger multi-select mode with select-all, atomic bulk soft delete and one-action batch undo.
+- Hierarchical category display in category management and the budget editor.
+- Create a new top-level category or child category inside the budget flow; the new category is selected and its budget name is filled automatically.
+- Parent and child category budgets show whether descendant spending is included.
+
+### Changed
+
+- Category management now displays the parent/child tree and supports creating or moving categories between levels.
+- Long-pressing a ledger row enters multi-select instead of deleting immediately, reducing accidental deletion.
+- Budget progress carries its category scope so the budget screen can identify subtree budgets.
+
+### Fixed
+
+- A single delete undo request is no longer cleared before the restore coroutine reads its transaction ids.
+
 ## v0.1.1-beta.1 - 2026-11-14
 
 ### Added
