@@ -20,6 +20,7 @@ All notable changes to TallyBook are documented here.
 ### Fixed
 
 - A single delete undo request is no longer cleared before the restore coroutine reads its transaction ids.
+- The ledger now has a single scroll owner, fixing repeated up/down jumps when dragging down from the summary or chart area.
 
 ## v0.1.1-beta.1 - 2026-11-14
 

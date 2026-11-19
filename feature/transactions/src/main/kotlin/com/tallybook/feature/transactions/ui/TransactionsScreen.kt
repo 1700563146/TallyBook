@@ -8,14 +8,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -138,7 +139,7 @@ fun TransactionsContent(
     modifier: Modifier = Modifier,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
-    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val listState = rememberLazyListState()
     var confirmBulkDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.scrollToTopTick) {
@@ -170,49 +171,62 @@ fun TransactionsContent(
             }
         },
     ) { innerPadding ->
-        Column(
+        // One lazy list owns the whole page. Keeping the summary cards outside this list made a
+        // downward drag behave differently depending on whether it started on a card or a row,
+        // which could make the visible content jump back and forth around the fixed header.
+        LazyColumn(
+            state = listState,
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 96.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            MonthHeader(
-                monthLabel = state.monthLabel,
-                expenseTotal = state.expenseTotal,
-                incomeTotal = state.incomeTotal,
-                onPrevious = onPreviousMonth,
-                onNext = onNextMonth,
-                onSearch = onOpenSearch,
-                isSelectionMode = state.isSelectionMode,
-                onStartSelection = { onStartSelection(null) },
-            )
+            item(key = "month-header") {
+                MonthHeader(
+                    monthLabel = state.monthLabel,
+                    expenseTotal = state.expenseTotal,
+                    incomeTotal = state.incomeTotal,
+                    onPrevious = onPreviousMonth,
+                    onNext = onNextMonth,
+                    onSearch = onOpenSearch,
+                    isSelectionMode = state.isSelectionMode,
+                    onStartSelection = { onStartSelection(null) },
+                )
+            }
 
             if (state.isSelectionMode) {
-                SelectionBar(
-                    selectedCount = state.selectedCount,
-                    allVisibleSelected = state.allVisibleSelected,
-                    isDeleting = state.isDeleting,
-                    onToggleAll = {
-                        if (state.allVisibleSelected) onClearSelection() else onSelectAll()
-                    },
-                    onCancel = onCancelSelection,
-                    onDelete = { confirmBulkDelete = true },
-                )
+                item(key = "selection-bar") {
+                    SelectionBar(
+                        selectedCount = state.selectedCount,
+                        allVisibleSelected = state.allVisibleSelected,
+                        isDeleting = state.isDeleting,
+                        onToggleAll = {
+                            if (state.allVisibleSelected) onClearSelection() else onSelectAll()
+                        },
+                        onCancel = onCancelSelection,
+                        onDelete = { confirmBulkDelete = true },
+                    )
+                }
             } else {
                 if (state.budgetCards.isNotEmpty()) {
-                    BudgetSummaryRow(cards = state.budgetCards)
+                    item(key = "budget-summary") {
+                        BudgetSummaryRow(cards = state.budgetCards)
+                    }
                 }
 
                 if (state.miniChart.isNotEmpty()) {
-                    MiniChartCard(bars = state.miniChart, onClick = onOpenInsights)
+                    item(key = "mini-chart") {
+                        MiniChartCard(bars = state.miniChart, onClick = onOpenInsights)
+                    }
                 }
             }
 
             when {
-                state.isLoading -> LoadingBox()
-                state.isEmpty -> EmptyState()
-                else -> DayGroupList(
+                state.isLoading -> item(key = "loading") { LoadingBox() }
+                state.isEmpty -> item(key = "empty") { EmptyState() }
+                else -> dayGroupItems(
                     groups = state.groups,
-                    listState = listState,
                     onEditClick = onEditClick,
                     isSelectionMode = state.isSelectionMode,
                     selectedIds = state.selectedIds,
@@ -509,53 +523,48 @@ private fun MonthHeader(
     }
 }
 
-@Composable
-private fun DayGroupList(
+private fun LazyListScope.dayGroupItems(
     groups: List<DayGroupUi>,
-    listState: androidx.compose.foundation.lazy.LazyListState,
     onEditClick: (String) -> Unit,
     isSelectionMode: Boolean,
     selectedIds: Set<String>,
     onStartSelection: (String?) -> Unit,
     onToggleSelection: (String) -> Unit,
 ) {
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        groups.forEach { group ->
-            item(key = "header-${group.dateKey}") {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        group.dayLabel,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Text(group.expenseLabel, style = MaterialTheme.typography.labelSmall)
-                }
-            }
-            items(group.items, key = { it.id }) { row ->
-                TransactionRow(
-                    row = row,
-                    isSelectionMode = isSelectionMode,
-                    isSelected = row.id in selectedIds,
-                    onClick = {
-                        if (isSelectionMode) onToggleSelection(row.id) else onEditClick(row.id)
-                    },
-                    onLongClick = {
-                        if (isSelectionMode) {
-                            onToggleSelection(row.id)
-                        } else {
-                            onStartSelection(row.id)
-                        }
-                    },
+    groups.forEach { group ->
+        item(key = "header-${group.dateKey}") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 12.dp, bottom = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    group.dayLabel,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
                 )
+                Text(group.expenseLabel, style = MaterialTheme.typography.labelSmall)
             }
+        }
+        items(group.items, key = { it.id }) { row ->
+            TransactionRow(
+                row = row,
+                isSelectionMode = isSelectionMode,
+                isSelected = row.id in selectedIds,
+                onClick = {
+                    if (isSelectionMode) onToggleSelection(row.id) else onEditClick(row.id)
+                },
+                onLongClick = {
+                    if (isSelectionMode) {
+                        onToggleSelection(row.id)
+                    } else {
+                        onStartSelection(row.id)
+                    }
+                },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
         }
     }
 }
@@ -568,9 +577,10 @@ private fun TransactionRow(
     isSelected: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .tallyCardDecoration(),
@@ -647,7 +657,12 @@ private fun TransactionRow(
 
 @Composable
 private fun LoadingBox() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(260.dp),
+        contentAlignment = Alignment.Center,
+    ) {
         CircularProgressIndicator()
     }
 }
@@ -655,10 +670,13 @@ private fun LoadingBox() {
 @Composable
 private fun EmptyState() {
     Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(260.dp)
+            .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        Spacer(Modifier.height(64.dp))
         Text("这个月还没有记录", style = MaterialTheme.typography.titleMedium)
         Text(
             "点右下角 + 记第一笔",
