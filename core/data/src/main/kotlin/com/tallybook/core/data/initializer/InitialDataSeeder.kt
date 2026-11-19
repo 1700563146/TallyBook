@@ -97,6 +97,7 @@ class InitialDataSeeder @Inject constructor(
         account("现金", AccountType.CASH, now, 0),
         account("支付宝", AccountType.E_WALLET, now, 1),
         account("银行卡", AccountType.DEBIT_CARD, now, 2),
+        account("微信支付", AccountType.E_WALLET, now, 3),
     )
 
     private fun account(name: String, type: AccountType, now: Long, sortOrder: Int) = AccountEntity(

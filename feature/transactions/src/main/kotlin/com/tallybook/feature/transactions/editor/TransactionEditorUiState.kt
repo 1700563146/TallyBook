@@ -2,6 +2,7 @@ package com.tallybook.feature.transactions.editor
 
 import com.tallybook.core.model.money.AmountInputState
 import com.tallybook.core.model.money.AmountKey
+import com.tallybook.core.model.transaction.AccountType
 import com.tallybook.core.model.transaction.TransactionType
 
 /** Which selector is currently expanded in the editor. */
@@ -71,6 +72,7 @@ data class CategoryOption(
 data class AccountOption(
     val id: String,
     val name: String,
+    val type: AccountType,
 )
 
 /** Keypad intents, kept as plain functions on the state so the UI stays dumb. */

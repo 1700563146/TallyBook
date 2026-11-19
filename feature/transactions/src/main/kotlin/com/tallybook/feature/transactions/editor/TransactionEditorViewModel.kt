@@ -10,6 +10,7 @@ import com.tallybook.core.data.repository.CategoryRepository
 import com.tallybook.core.data.repository.TransactionRepository
 import com.tallybook.core.model.money.AmountKey
 import com.tallybook.core.model.money.CurrencyCode
+import com.tallybook.core.model.transaction.AccountType
 import com.tallybook.core.model.transaction.Category
 import com.tallybook.core.model.transaction.Transaction
 import com.tallybook.core.model.transaction.TransactionId
@@ -69,6 +70,13 @@ class TransactionEditorViewModel @Inject constructor(
 
     private suspend fun load() {
         val accounts = accountRepository.observeActive().first()
+        val orderedAccounts = accounts.sortedWith(
+            compareBy(
+                { paymentMethodRank(it.name, it.type) },
+                { it.sortOrder },
+                { it.name },
+            ),
+        )
         allCategories = categoryRepository.observeActive().first()
 
         val now = clock.nowMillis()
@@ -116,8 +124,8 @@ class TransactionEditorViewModel @Inject constructor(
                     )
                     else -> current.amount
                 },
-                accounts = accounts.map { AccountOption(it.id, it.name) },
-                selectedAccountId = source?.accountId ?: accounts.firstOrNull()?.id,
+                accounts = orderedAccounts.map { AccountOption(it.id, it.name, it.type) },
+                selectedAccountId = source?.accountId ?: orderedAccounts.firstOrNull()?.id,
                 counterAccountId = transaction?.counterAccountId,
                 categories = sortedCategories,
                 selectedCategoryId = source?.categoryId
@@ -243,7 +251,15 @@ class TransactionEditorViewModel @Inject constructor(
     fun save() {
         val state = _uiState.value
         if (!state.canSave) {
-            _uiState.update { it.copy(error = "请填写金额并选择分类与账户") }
+            _uiState.update {
+                it.copy(
+                    error = if (state.isTransfer) {
+                        "请填写金额并选择转出与转入方式"
+                    } else {
+                        "请填写金额并选择账目分类与付款方式"
+                    },
+                )
+            }
             return
         }
         val amount = state.amount.toMoney(CurrencyCode.CNY) ?: run {
@@ -308,4 +324,18 @@ class TransactionEditorViewModel @Inject constructor(
 
         const val USAGE_WINDOW_DAYS = 90L
     }
+}
+
+/**
+ * The editor presents payment methods in the order most people reach for them, while preserving
+ * the user-defined order inside each group.
+ */
+internal fun paymentMethodRank(name: String, type: AccountType): Int = when {
+    name.contains("微信") -> 0
+    name.contains("支付宝") -> 1
+    type == AccountType.DEBIT_CARD || type == AccountType.CREDIT_CARD -> 2
+    type == AccountType.CASH -> 3
+    type == AccountType.E_WALLET -> 4
+    type == AccountType.INVESTMENT -> 5
+    else -> 6
 }

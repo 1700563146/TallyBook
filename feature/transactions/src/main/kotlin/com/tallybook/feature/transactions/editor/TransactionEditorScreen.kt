@@ -1,8 +1,8 @@
 package com.tallybook.feature.transactions.editor
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -17,15 +17,23 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,12 +61,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tallybook.core.model.money.AmountKey
+import com.tallybook.core.model.transaction.AccountType
+import com.tallybook.core.ui.components.tallyCardColors
+import com.tallybook.core.ui.components.tallyCardDecoration
+import com.tallybook.core.ui.components.tallyCardElevation
 import com.tallybook.feature.transactions.categoryIcon
 import java.time.Instant
 import java.time.ZoneId
@@ -345,56 +359,43 @@ fun TransactionEditorBody(
                 ModeSelector(mode = state.mode, onModeChange = onModeChange)
             }
 
-            Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                AmountDisplay(state)
-            }
-
-            if (!state.isTransfer) {
-                SectionTitle("分类")
-                CategoryChips(
-                    categories = state.categories,
-                    selectedId = state.selectedCategoryId,
-                    onSelect = onCategorySelected,
-                )
-            }
-
-            SectionTitle(if (state.isTransfer) "从账户" else "账户")
-            AccountChips(
-                accounts = state.accounts,
-                selectedId = state.selectedAccountId,
-                excludeId = if (state.isTransfer) state.counterAccountId else null,
-                onSelect = onAccountSelected,
+            EditorEssentialsCard(
+                state = state,
+                onNoteChange = onNoteChange,
+                onPickDate = onPickDate,
             )
 
             if (state.isTransfer) {
-                SectionTitle("转入账户")
+                SectionTitle("转出方式")
+                AccountChips(
+                    accounts = state.accounts,
+                    selectedId = state.selectedAccountId,
+                    excludeId = state.counterAccountId,
+                    onSelect = onAccountSelected,
+                )
+
+                SectionTitle("转入方式")
                 AccountChips(
                     accounts = state.accounts,
                     selectedId = state.counterAccountId,
                     excludeId = state.selectedAccountId,
                     onSelect = onCounterAccountSelected,
                 )
-            }
+            } else {
+                SectionTitle("付款方式")
+                PaymentMethodGrid(
+                    accounts = state.accounts,
+                    selectedId = state.selectedAccountId,
+                    onSelect = onAccountSelected,
+                )
 
-            SectionTitle("日期")
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onPickDate)
-                    .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(state.dateLabel, style = MaterialTheme.typography.bodyLarge)
-                Text("修改", style = MaterialTheme.typography.labelMedium)
+                SectionTitle("账目分类")
+                CategoryChips(
+                    categories = state.categories,
+                    selectedId = state.selectedCategoryId,
+                    onSelect = onCategorySelected,
+                )
             }
-
-            OutlinedTextField(
-                value = state.note,
-                onValueChange = onNoteChange,
-                label = { Text("备注") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
 
             state.error?.let { message ->
                 Text(
@@ -450,26 +451,102 @@ private fun ModeSelector(mode: EditorType, onModeChange: (EditorType) -> Unit) {
 }
 
 @Composable
-private fun AmountDisplay(state: TransactionEditorUiState) {
-    Column(
+private fun EditorEssentialsCard(
+    state: TransactionEditorUiState,
+    onNoteChange: (String) -> Unit,
+    onPickDate: () -> Unit,
+) {
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainerLow, MaterialTheme.shapes.medium)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        horizontalAlignment = Alignment.End,
+            .padding(top = 8.dp)
+            .tallyCardDecoration(),
+        shape = MaterialTheme.shapes.large,
+        colors = tallyCardColors(),
+        elevation = tallyCardElevation(),
     ) {
-        Text(
-            "¥",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = state.amount.display,
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.End,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            OutlinedTextField(
+                value = state.note,
+                onValueChange = onNoteChange,
+                label = { Text("备注") },
+                placeholder = {
+                    Text(
+                        when (state.mode) {
+                            EditorType.EXPENSE -> "这笔钱花在哪？"
+                            EditorType.INCOME -> "这笔钱从哪来？"
+                            EditorType.TRANSFER -> "例如：转到银行卡"
+                        },
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 1,
+                maxLines = 2,
+            )
+
+            Column {
+                Text(
+                    "金额",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        "¥",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 5.dp),
+                    )
+                    Spacer(Modifier.size(6.dp))
+                    Text(
+                        text = state.amount.display,
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            Card(
+                onClick = onPickDate,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                colors = tallyCardColors(MaterialTheme.colorScheme.secondaryContainer),
+                elevation = tallyCardElevation(),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Filled.CalendarMonth,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Spacer(Modifier.size(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "记账日期",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(state.dateLabel, style = MaterialTheme.typography.bodyLarge)
+                    }
+                    Text(
+                        "更改",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -557,6 +634,102 @@ private fun CategoryChips(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
+private fun PaymentMethodGrid(
+    accounts: List<AccountOption>,
+    selectedId: String?,
+    onSelect: (String) -> Unit,
+) {
+    if (accounts.isEmpty()) {
+        Text(
+            "没有可用付款方式，请先到设置里添加账户",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        accounts.chunked(PAYMENT_METHOD_COLUMNS).forEach { rowAccounts ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                rowAccounts.forEach { account ->
+                    PaymentMethodCard(
+                        account = account,
+                        selected = account.id == selectedId,
+                        onClick = { onSelect(account.id) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                repeat(PAYMENT_METHOD_COLUMNS - rowAccounts.size) {
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PaymentMethodCard(
+    account: AccountOption,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val visual = paymentMethodVisual(account)
+    Card(
+        onClick = onClick,
+        modifier = modifier
+            .height(88.dp)
+            .tallyCardDecoration(),
+        shape = MaterialTheme.shapes.medium,
+        colors = tallyCardColors(
+            if (selected) MaterialTheme.colorScheme.secondaryContainer else null,
+        ),
+        elevation = tallyCardElevation(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 8.dp, vertical = 9.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(visual.accent.copy(alpha = 0.14f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = visual.icon,
+                    contentDescription = null,
+                    tint = visual.accent,
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+            Text(
+                visual.title,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 5.dp),
+            )
+            Text(
+                visual.subtitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
 private fun AccountChips(
     accounts: List<AccountOption>,
     selectedId: String?,
@@ -574,9 +747,18 @@ private fun AccountChips(
     }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         selectable.forEach { account ->
+            val visual = paymentMethodVisual(account)
             AssistChip(
                 onClick = { onSelect(account.id) },
-                label = { Text(account.name) },
+                label = { Text(visual.title) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = visual.icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = visual.accent,
+                    )
+                },
                 colors = if (account.id == selectedId) {
                     AssistChipDefaults.assistChipColors(
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -588,3 +770,48 @@ private fun AccountChips(
         }
     }
 }
+
+private data class PaymentMethodVisual(
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val accent: Color,
+)
+
+@Composable
+private fun paymentMethodVisual(account: AccountOption): PaymentMethodVisual {
+    val typeLabel = when (account.type) {
+        AccountType.CASH -> "现金"
+        AccountType.DEBIT_CARD -> "储蓄卡"
+        AccountType.CREDIT_CARD -> "信用卡"
+        AccountType.E_WALLET -> "电子钱包"
+        AccountType.INVESTMENT -> "投资账户"
+        AccountType.OTHER -> "其他账户"
+    }
+
+    val title = when {
+        account.name.contains("微信") -> "微信"
+        account.name.contains("支付宝") -> "支付宝"
+        account.name.contains("银行卡") -> "银行卡"
+        else -> account.name
+    }
+    val subtitle = if (title == account.name) typeLabel else account.name
+    val (icon, accent) = when {
+        account.name.contains("微信") -> Icons.AutoMirrored.Filled.Chat to Color(0xFF07A84F)
+        account.name.contains("支付宝") -> Icons.Filled.AccountBalanceWallet to Color(0xFF1677D2)
+        account.type == AccountType.DEBIT_CARD || account.type == AccountType.CREDIT_CARD ->
+            Icons.Filled.CreditCard to Color(0xFF5968D8)
+        account.type == AccountType.CASH -> Icons.Filled.Payments to Color(0xFFB97800)
+        account.type == AccountType.INVESTMENT -> Icons.AutoMirrored.Filled.TrendingUp to
+            MaterialTheme.colorScheme.tertiary
+        else -> Icons.Filled.AccountBalanceWallet to MaterialTheme.colorScheme.primary
+    }
+    return PaymentMethodVisual(
+        title = title,
+        subtitle = subtitle,
+        icon = icon,
+        accent = accent,
+    )
+}
+
+private const val PAYMENT_METHOD_COLUMNS = 3

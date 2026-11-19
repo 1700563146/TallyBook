@@ -2,12 +2,12 @@
 
 一款 Kotlin + Jetpack Compose 的 Android 记账本，**单币种、离线优先、金额零误差**。
 
-当前状态：**v0.1.2 Beta**。已在 Android 模拟器（API 36）上跑通完整链路：
+当前状态：**v0.1.3 Beta**。已在 Android 模拟器（API 36）上跑通完整链路：
 记一笔 → 保存 → 月分组列表 → 多选删除 → 整批撤销 → 合计同步更新。
 
 ```
 ./gradlew :app:assembleDebug    ✅ app-debug.apk
-JVM 测试                        ✅ 146 tests, 0 failures
+JVM 测试                        ✅ 148 tests, 0 failures
 API 36 仪器化测试                ✅ 23 tests, OK
 ```
 
@@ -86,8 +86,8 @@ Windows 生成 keystore Base64：
 推送符合版本号的标签后，工作流会构建、校验签名、生成 SHA-256 并创建预发布 Release：
 
 ```bash
-git tag v0.1.2-beta.1
-git push origin v0.1.2-beta.1
+git tag v0.1.3-beta.1
+git push origin v0.1.3-beta.1
 ```
 
 如果 Gradle 找不到 SDK，在根目录建 `local.properties`：
@@ -182,7 +182,7 @@ sdk.dir=C:/Users/<you>/AppData/Local/Android/Sdk
 
 | 功能 | 状态 |
 | --- | --- |
-| 记一笔（自定义键盘 / 分类 / 账户 / 转账 / 日期 / 备注） | ✅ 可用 |
+| 记一笔（备注·金额·日期主卡片 / 微信·支付宝·银行卡等付款方式 / 分类 / 转账） | ✅ 可用 |
 | 明细列表（月份切换 / 日分组 / 小计 / 编辑 / 多选删除 / 整批撤销） | ✅ 可用 |
 | 跨月搜索与筛选（备注 / 分类 / 账户 / 收支类型） | ✅ 可用 |
 | 外观设置（系统 / 亮色 / 暗色 + 简约 / 扁平） | ✅ 可用 |

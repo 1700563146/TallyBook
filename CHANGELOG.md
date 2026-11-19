@@ -2,6 +2,19 @@
 
 All notable changes to TallyBook are documented here.
 
+## v0.1.3-beta.1 - 2026-11-19
+
+### Added
+
+- A redesigned transaction entry flow that groups note, amount and date into one primary card.
+- Payment-method cards for WeChat, Alipay, bank cards, cash and custom accounts, with method icons and everyday-use ordering.
+- New installations now include a zero-balance WeChat Pay account alongside cash, Alipay and bank card.
+
+### Changed
+
+- Category selection now follows payment-method selection and is labelled "账目分类".
+- Transfers use the same payment-method language for the source and destination accounts.
+
 ## v0.1.2-beta.1 - 2026-11-16
 
 ### Added
